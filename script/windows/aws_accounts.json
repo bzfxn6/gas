@@ -1,0 +1,31 @@
+{
+    "accounts": [
+        {
+            "name": "Development",
+            "account_number": "123456789012",
+            "s3_bucket": "dev-bucket",
+            "region": "us-east-1",
+            "rdp_port": "3389",
+            "ec2_tag": "dev-tuning-server",
+            "upload_folder": "uploads/dev"
+        },
+        {
+            "name": "Staging",
+            "account_number": "210987654321",
+            "s3_bucket": "staging-bucket",
+            "region": "us-west-2",
+            "rdp_port": "3390",
+            "ec2_tag": "staging-tuning-server",
+            "upload_folder": "uploads/staging"
+        },
+        {
+            "name": "Production",
+            "account_number": "987654321098",
+            "s3_bucket": "prod-bucket",
+            "region": "eu-west-1",
+            "rdp_port": "3391",
+            "ec2_tag": "prod-tuning-server",
+            "upload_folder": "uploads/prod"
+        }
+    ]
+} 
