@@ -1,33 +1,72 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-# Define log file path
-$logFilePath = Join-Path $env:TEMP ("aws_profile_debug_" + (Get-Date -Format "yyyyMMdd_HHmmss") + ".log")
-
-# Function to log messages
-function Log-Message {
-    param (
-        [string]$message
-    )
-    Add-Content -Path $logFilePath -Value "[$(Get-Date)] $message"
-}
-
-Log-Message "Script started"
-
 # Load AWS accounts from JSON
 try {
     $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-    Log-Message "Script path: $scriptPath"
-
-    $jsonPath = Join-Path $scriptPath "aws_accounts.json"
-    Log-Message "Attempting to load JSON from: $jsonPath"
-
-    $accountsData = Get-Content -Path $jsonPath | ConvertFrom-Json
-    Log-Message "Loaded $($accountsData.accounts.Count) AWS accounts"
+    $accountsData = Get-Content -Path (Join-Path $scriptPath "aws_accounts.json") | ConvertFrom-Json
 } catch {
-    Log-Message "Error loading aws_accounts.json: $_"
     [System.Windows.Forms.MessageBox]::Show("Error loading aws_accounts.json: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
     exit
+}
+
+# Function to create the main menu form
+function Show-MainMenu {
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text = "AWS Account Selector"
+    $form.Size = New-Object System.Drawing.Size(400,150)
+    $form.StartPosition = "CenterScreen"
+    $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+    $form.MaximizeBox = $false
+    $form.MinimizeBox = $false
+
+    # Create the account selection dropdown
+    $label = New-Object System.Windows.Forms.Label
+    $label.Location = New-Object System.Drawing.Point(10,20)
+    $label.Size = New-Object System.Drawing.Size(120,20)
+    $label.Text = "Select AWS Account:"
+    $form.Controls.Add($label)
+
+    $comboBox = New-Object System.Windows.Forms.ComboBox
+    $comboBox.Location = New-Object System.Drawing.Point(140,20)
+    $comboBox.Size = New-Object System.Drawing.Size(200,20)
+    $comboBox.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
+    $accountsData.accounts | ForEach-Object { $comboBox.Items.Add($_.name) }
+    $form.Controls.Add($comboBox)
+
+    # Create login button
+    $loginButton = New-Object System.Windows.Forms.Button
+    $loginButton.Location = New-Object System.Drawing.Point(140,60)
+    $loginButton.Size = New-Object System.Drawing.Size(200,30)
+    $loginButton.Text = "Login to AWS SSO"
+    $loginButton.Enabled = $false
+    $form.Controls.Add($loginButton)
+
+    # Add event handler for account selection
+    $comboBox.Add_SelectedIndexChanged({
+        $loginButton.Enabled = $true
+    })
+
+    # Add event handler for login button
+    $loginButton.Add_Click({
+        $selectedAccount = $accountsData.accounts | Where-Object { $_.name -eq $comboBox.SelectedItem }
+        if ($selectedAccount) {
+            $form.Hide()
+            try {
+                # Execute AWS SSO login command
+                $command = "aws sso login --profile " + $selectedAccount.name
+                Start-Process powershell -ArgumentList "-NoProfile -Command `"$command`"" -NoNewWindow -Wait
+                
+                # Show the options menu after successful login
+                Show-OptionsMenu -Account $selectedAccount
+            } catch {
+                [System.Windows.Forms.MessageBox]::Show("Error during AWS SSO login: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+                $form.Show()
+            }
+        }
+    })
+
+    $form.ShowDialog()
 }
 
 # Function to create the options menu form
@@ -65,15 +104,8 @@ function Show-OptionsMenu {
     $rdpButton.Add_Click({
         try {
             # Get EC2 instance ID using the tag
-            $tagValue = $Account.ec2_tag
-            $awsProfile = $Account.name
-            $region = $Account.region
-
-            $command = "aws ec2 describe-instances --filters Name=tag:Name,Values=$tagValue --query `"Reservations[].Instances[?State.Name=='running'].InstanceId`" --output text --profile $awsProfile --region $region"
-
-            Write-Host "Executing command:"
-            Write-Host $command
-
+            $command = "aws ec2 describe-instances --filters Name=tag:Name,Values=$($Account.ec2_tag) --query 'Reservations[].Instances[?State.Name==`running`].InstanceId' --output text --profile $($Account.name) --region $($Account.region)"
+            
             # Debug output
             Write-Host "Executing command: $command"
             $instanceId = Invoke-Expression $command
@@ -180,37 +212,18 @@ prompt for credentials:i:1
                 if ($selectedItems -is [string]) {
                     # Single folder selected
                     $folderName = Split-Path $selectedItems -Leaf
+                    $escapedPath = $selectedItems -replace '"', '\"'
                     $s3Path = "s3://$($Account.s3_bucket)/$($Account.upload_folder)/$folderName/"
-                    $escapedLocalPath = "`"$selectedItems`""
-                    $escapedS3Path = "`"$s3Path`""
-
-                    $arguments = @(
-                        "s3", "cp",
-                        $escapedLocalPath,
-                        $escapedS3Path,
-                        "--recursive",
-                        "--profile", $Account.name,
-                        "--region", $Account.region
-                    )
-
-                    Start-Process "aws" -ArgumentList $arguments -NoNewWindow -Wait
+                    $command = "aws s3 cp `"$escapedPath`" `"$s3Path`" --recursive --profile $($Account.name) --region $($Account.region)"
+                    Start-Process powershell -ArgumentList "-NoProfile -Command `"$command`"" -NoNewWindow -Wait
                 } else {
                     # Multiple files selected
                     foreach ($file in $selectedItems) {
                         $fileName = Split-Path $file -Leaf
+                        $escapedPath = $file -replace '"', '\"'
                         $s3Path = "s3://$($Account.s3_bucket)/$($Account.upload_folder)/$fileName"
-                        $escapedFile = "`"$file`""
-                        $escapedS3Path = "`"$s3Path`""
-
-                        $arguments = @(
-                            "s3", "cp",
-                            $escapedFile,
-                            $escapedS3Path,
-                            "--profile", $Account.name,
-                            "--region", $Account.region
-                        )
-
-                        Start-Process "aws" -ArgumentList $arguments -NoNewWindow -Wait
+                        $command = "aws s3 cp `"$escapedPath`" `"$s3Path`" --profile $($Account.name) --region $($Account.region)"
+                        Start-Process powershell -ArgumentList "-NoProfile -Command `"$command`"" -NoNewWindow -Wait
                     }
                 }
 
@@ -321,7 +334,6 @@ prompt for credentials:i:1
                 param (
                     [string]$Prefix = ""
                 )
-                $listView.Items.Clear()
                 $command = "aws s3 ls s3://$($Account.s3_bucket)/$Prefix --recursive --profile $($Account.name) --region $($Account.region)"
                 $items = Invoke-Expression $command
 
@@ -366,34 +378,21 @@ prompt for credentials:i:1
                 foreach ($item in $listView.SelectedItems) {
                     $s3Path = $item.Text
                     $localPath = Join-Path $downloadsPath (Split-Path $s3Path -Leaf)
-                    $escapedLocalPath = "`"$localPath`""
-
+                    $escapedLocalPath = $localPath -replace '"', '\"'
+                    
                     if ($item.SubItems[1].Text -eq "Folder") {
                         # Download folder
-                        $command = "aws s3 cp `"s3://$($Account.s3_bucket)/$s3Path`" $escapedLocalPath --recursive --profile $($Account.name) --region $($Account.region)"
+                        $command = "aws s3 cp `"s3://$($Account.s3_bucket)/$s3Path`" `"$escapedLocalPath`" --recursive --profile $($Account.name) --region $($Account.region)"
                     } else {
                         # Download file
-                        $command = "aws s3 cp `"s3://$($Account.s3_bucket)/$s3Path`" $escapedLocalPath --profile $($Account.name) --region $($Account.region)"
+                        $command = "aws s3 cp `"s3://$($Account.s3_bucket)/$s3Path`" `"$escapedLocalPath`" --profile $($Account.name) --region $($Account.region)"
                     }
-
+                    
                     # Debug output
                     Write-Host "Executing download command: $command"
                     try {
                         Invoke-Expression $command
                         Write-Host "Download completed successfully"
-
-                        # Update timestamps
-                        if ($item.SubItems[1].Text -eq "Folder") {
-                            if (Test-Path $localPath) {
-                                Get-ChildItem -Path $localPath -Recurse -File | ForEach-Object {
-                                    $_.LastWriteTime = Get-Date
-                                }
-                            }
-                        } else {
-                            if (Test-Path $localPath) {
-                                (Get-Item $localPath).LastWriteTime = Get-Date
-                            }
-                        }
                     } catch {
                         Write-Host "Error during download: $_"
                         [System.Windows.Forms.MessageBox]::Show("Error downloading file: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
@@ -438,187 +437,5 @@ prompt for credentials:i:1
     $form.ShowDialog()
 }
 
-# Function to create the main menu form
-function Show-MainMenu {
-    Log-Message "Initializing main menu form"
-
-    $form = New-Object System.Windows.Forms.Form
-    $form.Text = "AWS Account Selector"
-    $form.Size = New-Object System.Drawing.Size(420, 180)
-    $form.StartPosition = "CenterScreen"
-    $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
-    $form.MaximizeBox = $false
-    $form.MinimizeBox = $false
-
-    $label = New-Object System.Windows.Forms.Label
-    $label.Location = New-Object System.Drawing.Point(10, 20)
-    $label.Size = New-Object System.Drawing.Size(120, 20)
-    $label.Text = "Select AWS Account:"
-    $form.Controls.Add($label)
-
-    $comboBox = New-Object System.Windows.Forms.ComboBox
-    $comboBox.Location = New-Object System.Drawing.Point(140, 20)
-    $comboBox.Size = New-Object System.Drawing.Size(250, 20)
-    $comboBox.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-    Log-Message "Populating ComboBox with account names"
-    try {
-        $accountsData.accounts | ForEach-Object {
-            Log-Message "Adding account to ComboBox: $($_.name)"
-            $comboBox.Items.Add($_.name)
-        }
-    } catch {
-        Log-Message "Error populating ComboBox: $_"
-        $null = [System.Windows.Forms.MessageBox]::Show("Error populating account list: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
-    }
-    $form.Controls.Add($comboBox)
-
-    $loginButton = New-Object System.Windows.Forms.Button
-    $loginButton.Location = New-Object System.Drawing.Point(20, 60)
-    $loginButton.Size = New-Object System.Drawing.Size(120, 30)
-    $loginButton.Text = "Login to AWS SSO"
-    $loginButton.Enabled = $false
-    $form.Controls.Add($loginButton)
-
-    $useAccountButton = New-Object System.Windows.Forms.Button
-    $useAccountButton.Location = New-Object System.Drawing.Point(150, 60)
-    $useAccountButton.Size = New-Object System.Drawing.Size(120, 30)
-    $useAccountButton.Text = "Use Account"
-    $useAccountButton.Enabled = $false
-    $form.Controls.Add($useAccountButton)
-
-    $addProfileButton = New-Object System.Windows.Forms.Button
-    $addProfileButton.Location = New-Object System.Drawing.Point(280, 60)
-    $addProfileButton.Size = New-Object System.Drawing.Size(120, 30)
-    $addProfileButton.Text = "Add AWS Profile"
-    $addProfileButton.Enabled = $false
-    $form.Controls.Add($addProfileButton)
-
-    $comboBox.Add_SelectedIndexChanged({
-        $selected = $comboBox.SelectedItem
-        Log-Message "User selected account: $selected"
-        $loginButton.Enabled = $true
-        $useAccountButton.Enabled = $true
-        $addProfileButton.Enabled = $true
-    })
-
-    $loginButton.Add_Click({
-        $selectedAccount = $accountsData.accounts | Where-Object { $_.name -eq $comboBox.SelectedItem }
-        if ($selectedAccount) {
-            Log-Message "Login button clicked for account: $($selectedAccount.name)"
-            $form.Hide()
-            try {
-                $command = "aws sso login --profile " + $selectedAccount.name
-                Log-Message "Executing command: $command"
-                Start-Process powershell -ArgumentList "-NoProfile -Command `"$command`"" -Wait
-
-                $maxWait = 30
-                $waited = 0
-                while ($waited -lt $maxWait) {
-                    try {
-                        Log-Message "Checking if profile $($selectedAccount.name) is ready (attempt $waited)"
-                        $identity = aws sts get-caller-identity --profile $selectedAccount.name 2>$null
-                        $configCheck = aws configure list --profile $selectedAccount.name 2>$null
-
-                        if ($identity -and $configCheck) {
-                            Log-Message "Profile $($selectedAccount.name) is ready"
-                            Show-OptionsMenu -Account $selectedAccount
-                            $form.Close()
-                            return
-                        }
-                    } catch {
-                        Log-Message "Attempt $waited failed for profile $($selectedAccount.name)"
-                    }
-                    Start-Sleep -Seconds 1
-                    $waited++
-                }
-
-                Log-Message "Login may not have completed successfully for profile $($selectedAccount.name)"
-                $null = [System.Windows.Forms.MessageBox]::Show("Login may not have completed successfully. Please try again.", "Login Timeout", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
-                $form.Show()
-            } catch {
-                Log-Message "Error during AWS SSO login: $_"
-                $null = [System.Windows.Forms.MessageBox]::Show("Error during AWS SSO login: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
-                $form.Show()
-            }
-        }
-    })
-
-    $useAccountButton.Add_Click({
-        $selectedAccount = $accountsData.accounts | Where-Object { $_.name -eq $comboBox.SelectedItem }
-        if ($selectedAccount) {
-            Log-Message "Use Account button clicked for: $($selectedAccount.name)"
-            $form.Hide()
-            Start-Sleep -Seconds 1
-
-            $maxWait = 15
-            $waited = 0
-            while ($waited -lt $maxWait) {
-                try {
-                    Log-Message "Checking if profile $($selectedAccount.name) is ready (attempt $waited)"
-                    $identity = aws sts get-caller-identity --profile $selectedAccount.name 2>$null
-                    $configCheck = aws configure list --profile $selectedAccount.name 2>$null
-
-                    if ($identity -and $configCheck) {
-                        Log-Message "Profile $($selectedAccount.name) is ready"
-                        Show-OptionsMenu -Account $selectedAccount
-                        $form.Close()
-                        return
-                    }
-                } catch {
-                    Log-Message "Attempt $waited failed for profile $($selectedAccount.name)"
-                }
-                Start-Sleep -Seconds 1
-                $waited++
-            }
-
-            Log-Message "Profile $($selectedAccount.name) is not ready or credentials are missing"
-            $null = [System.Windows.Forms.MessageBox]::Show("AWS profile '$($selectedAccount.name)' is not ready or credentials are missing. Please log in first.", "Profile Not Ready", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
-            $form.Show()
-        }
-    })
-
-    $addProfileButton.Add_Click({
-        $selectedAccount = $accountsData.accounts | Where-Object { $_.name -eq $comboBox.SelectedItem }
-        if ($selectedAccount) {
-            Log-Message "Add Profile button clicked for: $($selectedAccount.name)"
-            $configPath = "$HOME\.aws\config"
-            $profileHeader = "[profile $($selectedAccount.name)]"
-
-            if (-not (Test-Path $configPath)) {
-                New-Item -ItemType File -Path $configPath -Force | Out-Null
-            }
-
-            if (-not (Get-Content $configPath | Select-String -SimpleMatch $profileHeader)) {
-                $timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
-                $backupPath = "$configPath.backup.$timestamp"
-                Copy-Item -Path $configPath -Destination $backupPath -Force
-
-                $profileBlock = @"
-
-$profileHeader
-sso_start_url = $($selectedAccount.sso_start_url)
-sso_region = $($selectedAccount.sso_region)
-sso_account_id = $($selectedAccount.account_number)
-sso_role_name = $($selectedAccount.sso_role_name)
-region = $($selectedAccount.region)
-output = json
-"@
-                Add-Content -Path $configPath -Value $profileBlock
-                $null = [System.Windows.Forms.MessageBox]::Show("Profile `"$($selectedAccount.name)`" added to AWS config. Backup created at `"$backupPath`".", "Success", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
-            } else {
-                $null = [System.Windows.Forms.MessageBox]::Show("Profile `"$($selectedAccount.name)`" already exists in AWS config.", "Info", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
-            }
-        }
-    })
-
-    $form.ShowDialog()
-}
-
 # Start the application
-try {
-    Show-MainMenu
-} catch {
-    $errorMessage = "Unhandled exception: $_"
-    Log-Message $errorMessage
-    $null = [System.Windows.Forms.MessageBox]::Show($errorMessage, "Fatal Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
-}
+Show-MainMenu 
