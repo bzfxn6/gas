@@ -1,31 +1,28 @@
 {
     "accounts": [
         {
-            "name": "Development",
+            "name": "dev",
             "account_number": "123456789012",
-            "s3_bucket": "dev-bucket",
+            "sso_start_url": "https://d-1234567890.awsapps.com/start",
+            "sso_region": "us-east-1",
+            "sso_role_name": "AdministratorAccess",
             "region": "us-east-1",
-            "rdp_port": "3389",
-            "ec2_tag": "dev-tuning-server",
-            "upload_folder": "uploads/dev"
+            "s3_bucket": "my-dev-bucket",
+            "upload_folder": "uploads",
+            "ec2_tag": "dev-server",
+            "rdp_port": "33890"
         },
         {
-            "name": "Staging",
+            "name": "prod",
             "account_number": "210987654321",
-            "s3_bucket": "staging-bucket",
-            "region": "us-west-2",
-            "rdp_port": "3390",
-            "ec2_tag": "staging-tuning-server",
-            "upload_folder": "uploads/staging"
-        },
-        {
-            "name": "Production",
-            "account_number": "987654321098",
-            "s3_bucket": "prod-bucket",
-            "region": "eu-west-1",
-            "rdp_port": "3391",
-            "ec2_tag": "prod-tuning-server",
-            "upload_folder": "uploads/prod"
+            "sso_start_url": "https://d-1234567890.awsapps.com/start",
+            "sso_region": "us-east-1",
+            "sso_role_name": "AdministratorAccess",
+            "region": "us-east-1",
+            "s3_bucket": "my-prod-bucket",
+            "upload_folder": "uploads",
+            "ec2_tag": "prod-server",
+            "rdp_port": "33891"
         }
     ]
 } 
