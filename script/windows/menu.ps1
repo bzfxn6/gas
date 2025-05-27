@@ -24,6 +24,13 @@ try {
 
     $accountsData = Get-Content -Path $jsonPath | ConvertFrom-Json
     Log-Message "Loaded $($accountsData.accounts.Count) AWS accounts"
+    
+    # Check if there are any accounts
+    if ($accountsData.accounts.Count -eq 0) {
+        Log-Message "No AWS accounts found in the JSON file"
+        [System.Windows.Forms.MessageBox]::Show("No AWS accounts found in aws_accounts.json. Please add accounts to the file.", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        exit
+    }
 } catch {
     Log-Message "Error loading aws_accounts.json: $_"
     [System.Windows.Forms.MessageBox]::Show("Error loading aws_accounts.json: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
@@ -401,6 +408,26 @@ prompt for credentials:i:1
                 }
 
                 [System.Windows.Forms.MessageBox]::Show("Files downloaded successfully to your Downloads folder", "Success", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+                
+                # Ask if user wants to logout
+                $logoutResult = [System.Windows.Forms.MessageBox]::Show("Would you like to logout of AWS account?", "Logout", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question)
+                if ($logoutResult -eq [System.Windows.Forms.DialogResult]::Yes) {
+                    try {
+                        # Execute AWS SSO logout command
+                        $command = "aws sso logout --profile $($Account.name)"
+                        Start-Process powershell -ArgumentList "-NoProfile -Command `"$command`"" -NoNewWindow -Wait
+
+                        # Show success message
+                        [System.Windows.Forms.MessageBox]::Show("Successfully logged out of AWS account: $($Account.name)", "Success", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+                        
+                        # Close the current form and return to main menu
+                        $s3Form.Close()
+                        Show-MainMenu
+                    } catch {
+                        [System.Windows.Forms.MessageBox]::Show("Error during logout: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+                    }
+                }
+                
                 $s3Form.Close()
             })
 
@@ -427,8 +454,9 @@ prompt for credentials:i:1
             # Show success message
             [System.Windows.Forms.MessageBox]::Show("Successfully logged out of AWS account: $($Account.name)", "Success", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
             
-            # Close the current form
+            # Close the current form and return to main menu
             $form.Close()
+            Show-MainMenu
         } catch {
             [System.Windows.Forms.MessageBox]::Show("Error during logout: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
         }
@@ -462,9 +490,18 @@ function Show-MainMenu {
     $comboBox.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
     Log-Message "Populating ComboBox with account names"
     try {
-        $accountsData.accounts | ForEach-Object {
-            Log-Message "Adding account to ComboBox: $($_.name)"
-            $comboBox.Items.Add($_.name)
+        if ($accountsData.accounts.Count -gt 0) {
+            $accountsData.accounts | ForEach-Object {
+                Log-Message "Adding account to ComboBox: $($_.name)"
+                $comboBox.Items.Add($_.name)
+            }
+            # Select the first item in the ComboBox
+            $comboBox.SelectedIndex = 0
+        } else {
+            Log-Message "No accounts available to populate ComboBox"
+            [System.Windows.Forms.MessageBox]::Show("No AWS accounts available. Please check aws_accounts.json.", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+            $form.Close()
+            return
         }
     } catch {
         Log-Message "Error populating ComboBox: $_"
