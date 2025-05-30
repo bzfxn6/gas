@@ -46,7 +46,7 @@ function Show-OptionsMenu {
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = "AWS Account Options - $($Account.name)"
-    $form.Size = New-Object System.Drawing.Size(400,300)
+    $form.Size = New-Object System.Drawing.Size(400,400)
     $form.StartPosition = "CenterScreen"
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
     $form.MaximizeBox = $false
@@ -420,8 +420,10 @@ prompt for credentials:i:1
                         # Show success message
                         [System.Windows.Forms.MessageBox]::Show("Successfully logged out of AWS account: $($Account.name)", "Success", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
                         
-                        # Close the current form and return to main menu
-                        $s3Form.Close()
+                        # Close and dispose the current form
+                        $s3Form.Dispose()
+                        
+                        # Show the main menu
                         Show-MainMenu
                     } catch {
                         [System.Windows.Forms.MessageBox]::Show("Error during logout: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
@@ -454,8 +456,10 @@ prompt for credentials:i:1
             # Show success message
             [System.Windows.Forms.MessageBox]::Show("Successfully logged out of AWS account: $($Account.name)", "Success", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
             
-            # Close the current form and return to main menu
-            $form.Close()
+            # Close and dispose the current form
+            $form.Dispose()
+            
+            # Show the main menu
             Show-MainMenu
         } catch {
             [System.Windows.Forms.MessageBox]::Show("Error during logout: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
@@ -529,6 +533,13 @@ function Show-MainMenu {
     $addProfileButton.Text = "Add AWS Profile"
     $addProfileButton.Enabled = $false
     $form.Controls.Add($addProfileButton)
+
+    # Enable buttons if an account is selected
+    if ($comboBox.SelectedIndex -ge 0) {
+        $loginButton.Enabled = $true
+        $useAccountButton.Enabled = $true
+        $addProfileButton.Enabled = $true
+    }
 
     $comboBox.Add_SelectedIndexChanged({
         $selected = $comboBox.SelectedItem
