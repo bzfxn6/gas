@@ -1,0 +1,78 @@
+name: Build Lambda Module
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'code/**'
+      - 'lambda-json/**'
+      - 'lambda-build-module/**'
+      - '.github/workflows/build-module.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'code/**'
+      - 'lambda-json/**'
+      - 'lambda-build-module/**'
+      - '.github/workflows/build-module.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Copy environment-specific .tool-versions
+      run: |
+        # Copy the build module's .tool-versions to root for asdf to use, fallback to root if not found
+        if [ -f "lambda-build-module/.tool-versions" ]; then
+          cp lambda-build-module/.tool-versions .tool-versions
+          echo "Using .tool-versions from lambda-build-module:"
+        else
+          echo "No .tool-versions found in lambda-build-module, using root .tool-versions"
+        fi
+        cat .tool-versions
+      
+    - name: Install asdf
+      uses: asdf-vm/actions/install@v4
+      
+    - name: Verify asdf installation
+      run: |
+        asdf list terraform
+        asdf list terragrunt
+        terraform --version
+        terragrunt --version
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+        
+    - name: Setup Terragrunt
+      run: |
+        cd lambda-build-module
+        terragrunt init
+        
+    - name: Plan Build Module
+      run: |
+        cd lambda-build-module
+        terragrunt plan -out=tfplan
+        
+    - name: Apply Build Module
+      if: github.ref == 'refs/heads/main'
+      run: |
+        cd lambda-build-module
+        terragrunt apply tfplan
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-outputs
+        path: |
+          lambda-build-module/lambda_hashes.json
+          lambda-build-module/builds/
+        retention-days: 7 

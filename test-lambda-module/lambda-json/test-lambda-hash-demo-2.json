@@ -1,0 +1,17 @@
+{
+  "create_role": true,
+  "description": "Test Lambda function to demonstrate hash generation",
+  "function_name": "test-lambda-hash-demo-2",
+  "handler": "test-lambda.lambda_handler",
+  "memory_size": "128",
+  "publish": false,
+  "runtime": "python3.9",
+  "source_path": [
+    {
+      "path": "${LAMBDA_PATH}/code/test-lambda.py",
+      "pip_requirements": false
+    }
+  ],
+  "timeout": 30,
+  "tags": ${TAGS}
+} 

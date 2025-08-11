@@ -1,0 +1,19 @@
+{
+    "cloudwatch_logs_retention_in_days": 90,
+    "create_role": false,
+    "description": "Lambda that part of the scm batch step function, this read s3 file",
+    "function_name": "${PREFIX}-scm-batch-processor-update-records",
+    "handler": "scm-batch-processor-readfroms3.lambda_handler",
+    "lambda_role": "${SCM_BATCH_PROCESSOR_READ_S3}",
+    "memory_size": "10240",
+    "publish": true,
+    "runtime": "python3.13",
+    "source_path": [
+        {
+            "path": "${LAMBDA_PATH}/code/scm-batch-processor-read-from-s3.py",
+            "pip_requirements": false
+        }
+    ],
+    "timeout": 900,
+    "tags": ${TAGS}
+}

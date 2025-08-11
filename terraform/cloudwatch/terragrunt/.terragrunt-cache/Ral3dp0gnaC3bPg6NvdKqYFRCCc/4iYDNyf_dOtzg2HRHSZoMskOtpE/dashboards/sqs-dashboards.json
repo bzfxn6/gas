@@ -1,0 +1,138 @@
+{
+  "sqs_comprehensive": {
+    "name": "sqs-comprehensive-${environment}",
+    "dashboard_body": {
+      "widgets": [
+        {
+          "type": "metric",
+          "x": 0,
+          "y": 0,
+          "width": 12,
+          "height": 6,
+          "properties": {
+            "metrics": [
+              ["AWS/SQS", "NumberOfMessagesReceived", "QueueName", "scm-batch-processor-queue"],
+              [".", "NumberOfMessagesSent", ".", "."],
+              [".", "ApproximateNumberOfMessagesVisible", ".", "."]
+            ],
+            "period": 300,
+            "stat": "Sum",
+            "region": "${region}",
+            "title": "SQS Queue Metrics - Batch Processor"
+          }
+        },
+        {
+          "type": "metric",
+          "x": 12,
+          "y": 0,
+          "width": 12,
+          "height": 6,
+          "properties": {
+            "metrics": [
+              ["AWS/SQS", "NumberOfMessagesDeleted", "QueueName", "scm-batch-processor-queue"],
+              [".", "SentMessageSize", ".", "."],
+              [".", "ApproximateAgeOfOldestMessage", ".", "."]
+            ],
+            "period": 300,
+            "stat": "Sum",
+            "region": "${region}",
+            "title": "SQS Queue Performance - Batch Processor"
+          }
+        },
+        {
+          "type": "metric",
+          "x": 0,
+          "y": 6,
+          "width": 12,
+          "height": 6,
+          "properties": {
+            "metrics": [
+              ["AWS/SQS", "NumberOfMessagesReceived", "QueueName", "scm-core-queue"],
+              [".", "NumberOfMessagesSent", ".", "."],
+              [".", "ApproximateNumberOfMessagesVisible", ".", "."]
+            ],
+            "period": 300,
+            "stat": "Sum",
+            "region": "${region}",
+            "title": "SQS Queue Metrics - Core Queue"
+          }
+        },
+        {
+          "type": "metric",
+          "x": 12,
+          "y": 6,
+          "width": 12,
+          "height": 6,
+          "properties": {
+            "metrics": [
+              ["AWS/SQS", "NumberOfMessagesDeleted", "QueueName", "scm-core-queue"],
+              [".", "SentMessageSize", ".", "."],
+              [".", "ApproximateAgeOfOldestMessage", ".", "."]
+            ],
+            "period": 300,
+            "stat": "Sum",
+            "region": "${region}",
+            "title": "SQS Queue Performance - Core Queue"
+          }
+        },
+        {
+          "type": "metric",
+          "x": 0,
+          "y": 12,
+          "width": 24,
+          "height": 6,
+          "properties": {
+            "metrics": [
+              ["AWS/SQS", "ApproximateAgeOfOldestMessage", "QueueName", "scm-batch-processor-queue"],
+              [".", "ApproximateAgeOfOldestMessage", "QueueName", "scm-core-queue"]
+            ],
+            "period": 300,
+            "stat": "Average",
+            "region": "${region}",
+            "title": "SQS Message Age",
+            "view": "timeSeries",
+            "stacked": false
+          }
+        },
+        {
+          "type": "metric",
+          "x": 0,
+          "y": 18,
+          "width": 24,
+          "height": 6,
+          "properties": {
+            "metrics": [
+              ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", "scm-batch-processor-queue"],
+              [".", "ApproximateNumberOfMessagesVisible", "QueueName", "scm-core-queue"]
+            ],
+            "period": 300,
+            "stat": "Sum",
+            "region": "${region}",
+            "title": "SQS Queue Depth",
+            "view": "timeSeries",
+            "stacked": false
+          }
+        },
+        {
+          "type": "metric",
+          "x": 0,
+          "y": 24,
+          "width": 24,
+          "height": 6,
+          "properties": {
+            "metrics": [
+              ["AWS/SQS", "SentMessageSize", "QueueName", "scm-batch-processor-queue"],
+              [".", "SentMessageSize", "QueueName", "scm-core-queue"]
+            ],
+            "period": 300,
+            "stat": "Average",
+            "region": "${region}",
+            "title": "SQS Message Size",
+            "view": "timeSeries",
+            "stacked": false
+          }
+        }
+      ]
+    }
+  }
+} 

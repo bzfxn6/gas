@@ -1,0 +1,63 @@
+name: Deploy Lambda Module
+
+on:
+  workflow_run:
+    workflows: ["Build Lambda Module"]
+    types:
+      - completed
+    branches: [ main ]
+  # Manual trigger
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Copy environment-specific .tool-versions
+      run: |
+        # Copy the deploy module's .tool-versions to root for asdf to use, fallback to root if not found
+        if [ -f "lambda-deploy-module/.tool-versions" ]; then
+          cp lambda-deploy-module/.tool-versions .tool-versions
+          echo "Using .tool-versions from lambda-deploy-module:"
+        else
+          echo "No .tool-versions found in lambda-deploy-module, using root .tool-versions"
+        fi
+        cat .tool-versions
+      
+    - name: Install asdf
+      uses: asdf-vm/actions/install@v4
+      
+    - name: Verify asdf installation
+      run: |
+        asdf list terraform
+        asdf list terragrunt
+        terraform --version
+        terragrunt --version
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+        
+    - name: Setup Terragrunt
+      run: |
+        cd lambda-deploy-module
+        terragrunt init
+        
+    - name: Plan Deploy Module
+      run: |
+        cd lambda-deploy-module
+        terragrunt plan -out=tfplan
+        
+    - name: Apply Deploy Module
+      if: github.ref == 'refs/heads/main'
+      run: |
+        cd lambda-deploy-module
+        terragrunt apply tfplan 

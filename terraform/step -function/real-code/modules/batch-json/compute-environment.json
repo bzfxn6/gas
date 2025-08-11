@@ -1,0 +1,28 @@
+{
+  "name": "${PREFIX}-batch-compute",
+  "type": "MANAGED",
+  "compute_resources": {
+    "type": "EC2",
+    "max_vcpus": 256,
+    "min_vcpus": 0,
+    "desired_vcpus": 64,
+    "instance_types": [
+      "c5.4xlarge",
+      "c5.2xlarge",
+      "c5.xlarge"
+    ],
+    "subnets": ${SUBNETS},
+    "security_group_ids": [
+      "${SCM_BATCH_PROCESSOR_BATCH_SG}"
+    ],
+    "instance_role": "${SCM_BATCH_PROCESSOR_BATCH_INSTANCE_ROLE}",
+    "bid_percentage": 100,
+    "launch_template": {
+      "launch_template_id": "${PREFIX}-batch-launch-template",
+      "version": "$Latest"
+    },
+    "tags": ${TAGS}
+  },
+  "service_role": "${SCM_BATCH_PROCESSOR_BATCH_ROLE}",
+  "state": "ENABLED"
+} 

@@ -1,0 +1,28 @@
+{
+    "cloudwatch_logs_retention_in_days": 90,
+    "create_role": false,
+    "description": "Lambda that part of the scm batch step function, this will read the orginal S3 buket and pass details onto the next step.",
+    "function_name": "${PREFIX}-scm-batch-processor-send-to-kafka",
+    "handler":       "scm-batch-processor-send-to-kafka.lambda_handler",
+    "lambda_role": "${SCM_BATCH_PROCESSOR_SEND_TO_KAFKA}",
+    "memory_size": "10240",
+    "publish": true,
+    "runtime": "python3.13",
+    "source_path": [
+        {
+            "path": "${LAMBDA_PATH}/code/scm-batch-processor-send-to-kafka.py",
+            "pip_requirements": false
+        }
+    ],
+    "timeout": 900,
+    "layers": [
+        "${SCM_BATCH_PROCESSOR_SEND_TO_KAFKA_DEV_LAYER}"
+    ],
+    "vpc_subnet_ids": ${SUBNETS},
+    "vpc_security_group_ids" : ["${SCM_BATCH_PROCESSOR_SEND_TO_KAFKA_SG}"],
+    "environment_variables" : {
+        "msk_brokers": "${MSK_BROKERS}",
+        "msk_topic": "${MSK_TOPIC}"
+    },
+    "tags": ${TAGS}
+}

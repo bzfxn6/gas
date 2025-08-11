@@ -1,0 +1,185 @@
+{
+  "step_function_overview": {
+    "name": "step-function-overview-${environment}",
+    "dashboard_body": {
+      "widgets": [
+        {
+          "type": "metric",
+          "x": 0,
+          "y": 0,
+          "width": 12,
+          "height": 6,
+          "properties": {
+            "metrics": [
+              ["AWS/States", "ExecutionsStarted", "StateMachineArn", "arn:aws:states:${region}:*:stateMachine:scm-batch-processor"],
+              [".", "ExecutionsSucceeded", ".", "."],
+              [".", "ExecutionsFailed", ".", "."]
+            ],
+            "period": 300,
+            "stat": "Sum",
+            "region": "${region}",
+            "title": "Step Function Executions - Batch Processor"
+          }
+        },
+        {
+          "type": "metric",
+          "x": 12,
+          "y": 0,
+          "width": 12,
+          "height": 6,
+          "properties": {
+            "metrics": [
+              ["AWS/States", "ExecutionTime", "StateMachineArn", "arn:aws:states:${region}:*:stateMachine:scm-batch-processor"],
+              [".", "ThrottledEvents", ".", "."]
+            ],
+            "period": 300,
+            "stat": "Average",
+            "region": "${region}",
+            "title": "Step Function Performance - Batch Processor"
+          }
+        },
+        {
+          "type": "metric",
+          "x": 0,
+          "y": 6,
+          "width": 24,
+          "height": 6,
+          "properties": {
+            "metrics": [
+              ["AWS/States", "ExecutionsFailed", "StateMachineArn", "arn:aws:states:${region}:*:stateMachine:scm-batch-processor"]
+            ],
+            "period": 300,
+            "stat": "Sum",
+            "region": "${region}",
+            "title": "Step Function Failures - Batch Processor",
+            "view": "timeSeries",
+            "stacked": false
+          }
+        }
+      ]
+    }
+  },
+  "step_function_errors": {
+    "name": "step-function-errors-${environment}",
+    "dashboard_body": {
+      "widgets": [
+        {
+          "type": "metric",
+          "x": 0,
+          "y": 0,
+          "width": 24,
+          "height": 6,
+          "properties": {
+            "metrics": [
+              ["AWS/States", "ExecutionsFailed", "StateMachineArn", "arn:aws:states:${region}:*:stateMachine:scm-batch-processor"]
+            ],
+            "period": 300,
+            "stat": "Sum",
+            "region": "${region}",
+            "title": "Step Function Execution Failures",
+            "view": "timeSeries",
+            "stacked": false
+          }
+        },
+        {
+          "type": "metric",
+          "x": 0,
+          "y": 6,
+          "width": 24,
+          "height": 6,
+          "properties": {
+            "metrics": [
+              ["AWS/States", "ThrottledEvents", "StateMachineArn", "arn:aws:states:${region}:*:stateMachine:scm-batch-processor"]
+            ],
+            "period": 300,
+            "stat": "Sum",
+            "region": "${region}",
+            "title": "Step Function Throttled Events",
+            "view": "timeSeries",
+            "stacked": false
+          }
+        }
+      ]
+    }
+  },
+  "kubernetes_metrics": {
+    "name": "kubernetes-metrics-${environment}",
+    "dashboard_body": {
+      "widgets": [
+        {
+          "type": "metric",
+          "x": 0,
+          "y": 0,
+          "width": 12,
+          "height": 6,
+          "properties": {
+            "metrics": [
+              ["ContainerInsights/PodMetrics", "pod_cpu_utilization", "PodName", "test-bp-code"],
+              [".", "pod_cpu_utilization_over_pod_limit", ".", "."],
+              [".", "pod_cpu_reserved_capacity", ".", "."]
+            ],
+            "period": 300,
+            "stat": "Average",
+            "region": "${region}",
+            "title": "Kubernetes Pod CPU Usage - test-bp-code"
+          }
+        },
+        {
+          "type": "metric",
+          "x": 12,
+          "y": 0,
+          "width": 12,
+          "height": 6,
+          "properties": {
+            "metrics": [
+              ["ContainerInsights/PodMetrics", "pod_memory_utilization", "PodName", "test-bp-code"],
+              [".", "pod_memory_utilization_over_pod_limit", ".", "."],
+              [".", "pod_memory_reserved_capacity", ".", "."]
+            ],
+            "period": 300,
+            "stat": "Average",
+            "region": "${region}",
+            "title": "Kubernetes Pod Memory Usage - test-bp-code"
+          }
+        },
+        {
+          "type": "metric",
+          "x": 0,
+          "y": 6,
+          "width": 24,
+          "height": 6,
+          "properties": {
+            "metrics": [
+              ["ContainerInsights/PodMetrics", "pod_cpu_utilization", "PodName", "test-bp-code"]
+            ],
+            "period": 300,
+            "stat": "Average",
+            "region": "${region}",
+            "title": "Kubernetes Pod CPU Utilization - test-bp-code",
+            "view": "timeSeries",
+            "stacked": false
+          }
+        },
+        {
+          "type": "metric",
+          "x": 0,
+          "y": 12,
+          "width": 24,
+          "height": 6,
+          "properties": {
+            "metrics": [
+              ["ContainerInsights/PodMetrics", "pod_network_rx_bytes", "PodName", "test-bp-code"],
+              [".", "pod_network_tx_bytes", ".", "."]
+            ],
+            "period": 300,
+            "stat": "Sum",
+            "region": "${region}",
+            "title": "Kubernetes Pod Network Traffic - test-bp-code",
+            "view": "timeSeries",
+            "stacked": false
+          }
+        }
+      ]
+    }
+  }
+} 

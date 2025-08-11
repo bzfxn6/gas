@@ -1,0 +1,168 @@
+name: Manual Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - preprod
+          - prod
+      region:
+        description: 'AWS region to deploy to'
+        required: true
+        type: choice
+        options:
+          - eu-west-1
+          - eu-west-2
+          - us-east-1
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+        default: 'plan'
+      auto_approve:
+        description: 'Auto approve apply/destroy operations'
+        required: false
+        type: boolean
+        default: false
+      validate_s3_package:
+        description: 'Validate Lambda package exists in S3 before deployment'
+        required: false
+        type: boolean
+        default: true
+      validate_lambda_ready:
+        description: 'Validate Lambda function is ready to run after deployment'
+        required: false
+        type: boolean
+        default: true
+      run_lambda_test:
+        description: 'Run a test invocation of the Lambda function'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate environment and region combination
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          REGION="${{ github.event.inputs.region }}"
+          
+          case $ENV in
+            "dev"|"staging")
+              if [ "$REGION" != "eu-west-1" ]; then
+                echo "❌ Error: $ENV environment can only be deployed to eu-west-1"
+                exit 1
+              fi
+              ;;
+            "preprod")
+              if [ "$REGION" != "us-east-1" ] && [ "$REGION" != "eu-west-2" ]; then
+                echo "❌ Error: preprod environment can only be deployed to us-east-1 or eu-west-2"
+                exit 1
+              fi
+              ;;
+            "prod")
+              if [ "$REGION" != "eu-west-2" ]; then
+                echo "❌ Error: prod environment can only be deployed to eu-west-2"
+                exit 1
+              fi
+              ;;
+            *)
+              echo "❌ Error: Unknown environment $ENV"
+              exit 1
+              ;;
+          esac
+          
+          echo "✅ Valid combination: $ENV environment in $REGION region"
+    
+  validate-s3:
+    needs: validate
+    if: ${{ github.event.inputs.validate_s3_package == 'true' && github.event.inputs.action == 'apply' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ github.event.inputs.region }}
+          
+      - name: Validate S3 package exists
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          REGION="${{ github.event.inputs.region }}"
+          BUCKET="lambda-packages-test-project-$ENV"
+          
+          echo "🔍 Checking if Lambda package exists in S3..."
+          echo "Bucket: $BUCKET"
+          echo "Region: $REGION"
+          
+          # Check if bucket exists
+          if aws s3 ls "s3://$BUCKET" >/dev/null 2>&1; then
+            echo "✅ S3 bucket exists: $BUCKET"
+          else
+            echo "❌ S3 bucket not found: $BUCKET"
+            exit 1
+          fi
+          
+          # Check if package exists
+          if aws s3 ls "s3://$BUCKET/packages/test-lambda.zip" >/dev/null 2>&1; then
+            echo "✅ Lambda package found: s3://$BUCKET/packages/test-lambda.zip"
+            
+            # Get package metadata
+            aws s3api head-object --bucket "$BUCKET" --key "packages/test-lambda.zip" --query 'ETag,LastModified,ContentLength' --output table
+          else
+            echo "❌ Lambda package not found: s3://$BUCKET/packages/test-lambda.zip"
+            exit 1
+          fi
+    
+  build:
+    needs: [validate, validate-s3]
+    uses: ./.github/workflows/terragrunt.yml
+    with:
+      module_path: lambda-build-module
+      environment: ${{ github.event.inputs.environment }}
+      action: ${{ github.event.inputs.action }}
+      auto_approve: ${{ github.event.inputs.auto_approve }}
+      aws_region: ${{ github.event.inputs.region }}
+    secrets: inherit
+    
+  build-apply:
+    needs: [validate, build]
+    if: github.event.inputs.action == 'apply' && needs.build.result == 'success'
+    uses: ./.github/workflows/terragrunt.yml
+    with:
+      module_path: lambda-build-module
+      environment: ${{ github.event.inputs.environment }}
+      action: apply
+      auto_approve: true
+      aws_region: ${{ github.event.inputs.region }}
+    secrets: inherit
+    
+  deploy:
+    needs: [validate, build, build-apply]
+    if: |
+      (github.event.inputs.action == 'plan' && needs.build.result == 'success') ||
+      (github.event.inputs.action == 'apply' && needs.build-apply.result == 'success')
+    uses: ./.github/workflows/terragrunt.yml
+    with:
+      module_path: lambda-deploy-module
+      environment: ${{ github.event.inputs.environment }}
+      action: ${{ github.event.inputs.action }}
+      auto_approve: ${{ github.event.inputs.auto_approve }}
+      aws_region: ${{ github.event.inputs.region }}
+    secrets: inherit 

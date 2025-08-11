@@ -1,0 +1,85 @@
+name: Terragrunt Module (Environment Variables)
+
+on:
+  workflow_call:
+    inputs:
+      module_path:
+        description: 'Path to the Terragrunt module'
+        required: true
+        type: string
+      environment:
+        description: 'Environment name'
+        required: true
+        type: string
+      action:
+        description: 'Action to perform (plan, apply, destroy)'
+        required: true
+        type: string
+        default: 'plan'
+      auto_approve:
+        description: 'Auto approve apply/destroy'
+        required: false
+        type: boolean
+        default: false
+      terraform_version:
+        description: 'Terraform version to use'
+        required: false
+        type: string
+        default: '1.12.2'
+      terragrunt_version:
+        description: 'Terragrunt version to use'
+        required: false
+        type: string
+        default: '0.83.0'
+
+jobs:
+  terragrunt:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install asdf
+      uses: asdf-vm/actions/install@v4
+      
+    - name: Install specific tool versions
+      run: |
+        # Install specific versions using environment variables
+        asdf install terraform ${{ inputs.terraform_version }}
+        asdf install terragrunt ${{ inputs.terragrunt_version }}
+        asdf local terraform ${{ inputs.terraform_version }}
+        asdf local terragrunt ${{ inputs.terragrunt_version }}
+        echo "Installed Terraform ${{ inputs.terraform_version }} and Terragrunt ${{ inputs.terragrunt_version }}"
+      
+    - name: Verify asdf installation
+      run: |
+        asdf list terraform
+        asdf list terragrunt
+        terraform --version
+        terragrunt --version
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+        
+    - name: Setup Terragrunt
+      run: |
+        cd ${{ inputs.module_path }}
+        terragrunt init
+        
+    - name: Run Terragrunt ${{ inputs.action }}
+      run: |
+        cd ${{ inputs.module_path }}
+        if [ "${{ inputs.action }}" = "apply" ] || [ "${{ inputs.action }}" = "destroy" ]; then
+          if [ "${{ inputs.auto_approve }}" = "true" ]; then
+            terragrunt ${{ inputs.action }} -auto-approve
+          else
+            terragrunt ${{ inputs.action }}
+          fi
+        else
+          terragrunt ${{ inputs.action }}
+        fi 

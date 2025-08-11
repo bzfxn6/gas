@@ -1,0 +1,183 @@
+{
+    "Comment": "A Step Function to process files with customer data, reporting the overall status.",
+    "StartAt": "ReadJSONFile",
+    "States": {
+        "ChoiceState": {
+            "Choices": [
+                {
+                    "Next": "ReportFailure",
+                    "StringMatches": "SUBMISSION_FAILED",
+                    "Variable": "$.extractedData.batchStatus"
+                }
+            ],
+            "Default": "ProcessFile", 
+            "Type": "Choice"
+        },
+        "DeploymentChoiceState": {
+            "Choices": [
+                {
+                    "Next": "SendToSqsCore",
+                    "StringMatches": "CORE",
+                    "Variable": "$.processingResults.deployment"
+                }
+            ],
+            "Default": "SendToKafka",
+            "Type": "Choice"
+        },
+        "FailureState": {
+            "Cause": "Processing Failed",
+            "Error": "StepFunctionError",
+            "Type": "Fail"
+        },
+        "ProcessFile": {
+            "Catch": [
+                {
+                    "ErrorEquals": [
+                        "States.ALL"
+                    ],
+                    "Next": "ReportFailure",
+                    "ResultPath": "$.processingResults"
+                }
+            ],
+            "InputPath": "$.extractedData",
+            "Next": "ProcessFileChoiceState",
+            "Resource": "${SCM_BATCH_PROC_UPDATE_RECORDS_LAMBDA_ARN}",
+            "ResultPath": "$.processingResults",
+            "Type": "Task"
+        },
+        "ProcessFileChoiceState": {
+            "Choices": [
+                {
+                    "Next": "ReportFailure",
+                    "StringMatches": "SUBMISSION_FAILED",
+                    "Variable": "$.processingResults.batchStatus"
+                },
+                {
+                    "Next": "ContinueProcessing",
+                    "IsPresent": true,
+                    "Variable": "$.processingResults.continuationToken"
+                }
+            ],
+            "Default": "DeploymentChoiceState",
+            "Type": "Choice"
+        },
+        "ContinueProcessing": {
+            "Type": "Wait",
+            "Seconds": 1,
+            "Next": "ProcessFile"
+        },
+        "ReadJSONFile": {
+            "Catch": [
+                {
+                    "ErrorEquals": [
+                        "States.ALL"
+                    ],
+                    "Next": "ReportFailure",
+                    "ResultPath": "$.errorCause"
+                }
+            ],
+            "Next": "ChoiceState",
+            "Resource": "${SCM_BATCH_PROC_READ_S3_LAMBDA_ARN}",
+            "ResultPath": "$.extractedData",
+            "Retry": [
+                {
+                    "BackoffRate": 1,
+                    "ErrorEquals": [
+                        "States.TaskFailed"
+                    ],
+                    "IntervalSeconds": 1,
+                    "MaxAttempts": 1
+                }
+            ],
+            "Type": "Task"
+        },
+        "ReportFailure": {
+            "Next": "FailureState",
+            "Parameters": {
+                "MessageBody": {
+                    "batchId.$": "$.extractedData.batchId",
+                    "batchStatus.$": "$.extractedData.batchStatus",
+                    "customerId.$": "$.extractedData.customerId",
+                    "notificationId.$": "States.UUID()",
+                    "errorMessage.$": "$.extractedData.errorMessage",
+                    "progress.$": "$.extractedData.progress"
+                },
+                "QueueUrl": "${SCM_BATCH_PROC_SQS_QUEUE_URL}"
+            },
+            "Resource": "arn:aws:states:::sqs:sendMessage",
+            "Type": "Task"
+        },
+        "SendToKafka": {
+            "Catch": [
+                {
+                    "ErrorEquals": [
+                        "States.ALL"
+                    ],
+                    "Next": "ReportFailure",
+                    "ResultPath": "$.kafkaResults"
+                }
+            ],
+            "InputPath": "$.processingResults",
+            "Next": "SendToKafkaChoice",
+            "Resource": "${SCM_BATCH_PROC_SEND_TO_KAFKA_LAMBDA_ARN}",
+            "ResultPath": "$.kafkaResults",
+            "Type": "Task"
+        },
+        "SendToKafkaChoice": {
+            "Choices": [
+                {
+                    "Next": "ReportFailure",
+                    "StringMatches": "SUBMISSION_FAILED",
+                    "Variable": "$.kafkaResults.batchStatus"
+                }
+            ],
+            "Default": "SendToSQS",
+            "Type": "Choice"
+        },
+        "SendToSQS": {
+            "Next": "SuccessState",
+            "Parameters": {
+                "MessageBody": {
+                    "batchId.$": "$.processingResults.batchId",
+                    "batchStatus": "SUBMITTED_FOR_PROCESSING",
+                    "customerId.$": "$.processingResults.customerId",
+                    "notificationId.$": "States.UUID()",
+                    "progress.$": "$.processingResults.progress"
+                },
+                "QueueUrl": "${SCM_BATCH_PROC_SQS_QUEUE_URL}"
+            },
+            "Resource": "arn:aws:states:::sqs:sendMessage",
+            "Type": "Task"
+        },
+        "SendToSQSCoreChoice": {
+            "Choices": [
+                {
+                    "Next": "ReportFailure",
+                    "StringMatches": "SUBMISSION_FAILED",
+                    "Variable": "$.sqsCoreResults.batchStatus"
+                }
+            ],
+            "Default": "SendToSQS",
+            "Type": "Choice"
+        },
+        "SendToSqsCore": {
+            "Catch": [
+                {
+                    "ErrorEquals": [
+                        "States.ALL"
+                    ],
+                    "Next": "ReportFailure",
+                    "ResultPath": "$.kafkaResults"
+                }
+            ],
+            "InputPath": "$.processingResults",
+            "Next": "SendToSQSCoreChoice",
+            "Resource": "${SCM_BATCH_PROC_SQS_CORE_LAMBDA_ARN}",
+            "ResultPath": "$.sqsCoreResults",
+            "Type": "Task"
+        },
+        "SuccessState": {
+            "Type": "Succeed"
+        }
+    }
+}

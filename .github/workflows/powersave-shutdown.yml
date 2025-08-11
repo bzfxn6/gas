@@ -1,0 +1,302 @@
+name: PowerSave Shutdown
+
+on:
+  schedule:
+    # Run daily at 20:00 UTC
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+    inputs:
+      aws_region:
+        description: 'AWS Region to operate in'
+        required: true
+        default: 'eu-west-2'
+        type: choice
+        options:
+          - eu-west-2
+          - eu-west-1
+          - us-east-1
+      dry_run:
+        description: 'Dry run mode (will not actually stop resources)'
+        required: false
+        default: false
+        type: boolean
+      environment:
+        description: 'Environment to target (leave empty for all environments)'
+        required: false
+        type: choice
+        options:
+          - all
+          - gss-sandbox
+          - gss-dev
+          - gss-int
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  extract-environments:
+    runs-on: ubuntu-latest
+    outputs:
+      environments: ${{ steps.set-environments.outputs.environments }}
+    steps:
+      - name: Set Environments
+        id: set-environments
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "all" ] || [ -z "${{ github.event.inputs.environment }}" ]; then
+            echo 'environments=["gss-sandbox","gss-dev","gss-int"]' >> $GITHUB_OUTPUT
+          else
+            echo 'environments=["${{ github.event.inputs.environment }}"]' >> $GITHUB_OUTPUT
+          fi
+
+  powersave-shutdown:
+    needs: extract-environments
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: ${{ fromJson(needs.extract-environments.outputs.environments) }}
+      fail-fast: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install python-hcl2
+
+      - name: Extract Environment Details
+        id: extract_env
+        run: |
+          echo "Processing environment: ${{ matrix.environment }}"
+          
+          # Convert environment name to path format
+          env_path=$(echo ${{ matrix.environment }} | sed 's/-/\//g')
+          
+          # Check if accounts.hcl exists
+          if [ -f "terraform/$env_path/accounts.hcl" ]; then
+            echo "Found accounts.hcl for ${{ matrix.environment }}"
+            
+            # Extract AWS account number using Python
+            account_number=$(python3 -c "import hcl2; import sys; data = hcl2.load(open('terraform/$env_path/accounts.hcl')); print(data.get('locals', {}).get('aws_account_number', ''))")
+            
+            if [ -n "$account_number" ]; then
+              echo "aws_account_number=$account_number" >> $GITHUB_OUTPUT
+              echo "✅ Extracted account number for ${{ matrix.environment }}: $account_number"
+            else
+              echo "❌ Could not extract account number for ${{ matrix.environment }}"
+              exit 1
+            fi
+          else
+            echo "❌ accounts.hcl not found for ${{ matrix.environment }} at terraform/$env_path/accounts.hcl"
+            exit 1
+          fi
+
+      - name: Process Environment
+        id: process_environment
+        run: |
+          ENVIRONMENT="${{ matrix.environment }}"
+          REGION="${{ github.event.inputs.aws_region || 'eu-west-2' }}"
+          DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
+          ACCOUNT_NUMBER="${{ steps.extract_env.outputs.aws_account_number }}"
+          
+          echo "🔍 Processing environment: $ENVIRONMENT"
+          echo "📋 Using AWS account: $ACCOUNT_NUMBER for environment: $ENVIRONMENT"
+          
+          # Configure AWS credentials for this account
+          export AWS_DEFAULT_REGION=$REGION
+          
+          # Assume role for this account
+          role_arn="arn:aws:iam::${ACCOUNT_NUMBER}:role/${ENVIRONMENT}-gss-tuning-runner-ro-ci-role"
+          echo "🔐 Assuming role: $role_arn"
+          
+          # Get temporary credentials
+          credentials=$(aws sts assume-role \
+            --role-arn "$role_arn" \
+            --role-session-name "powersave-shutdown-${ENVIRONMENT}" \
+            --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+            --output text 2>/dev/null)
+          
+          if [ $? -ne 0 ]; then
+            echo "❌ Failed to assume role for $ENVIRONMENT"
+            exit 1
+          fi
+          
+          # Set AWS credentials
+          export AWS_ACCESS_KEY_ID=$(echo $credentials | cut -f1)
+          export AWS_SECRET_ACCESS_KEY=$(echo $credentials | cut -f2)
+          export AWS_SESSION_TOKEN=$(echo $credentials | cut -f3)
+          
+          echo "✅ Successfully configured AWS credentials for $ENVIRONMENT"
+          
+          # Stop Aurora PostgreSQL Clusters for this environment
+          echo "🔍 Finding Aurora PostgreSQL clusters in $ENVIRONMENT..."
+          
+          CLUSTERS=$(aws rds describe-db-clusters \
+            --region $REGION \
+            --query 'DBClusters[?Engine==`aurora-postgresql`].[DBClusterIdentifier,DBClusterArn]' \
+            --output text)
+          
+          STOPPED_CLUSTERS=""
+          
+          while IFS=$'\t' read -r CLUSTER_ID CLUSTER_ARN; do
+            if [ -n "$CLUSTER_ID" ]; then
+              echo "Checking cluster: $CLUSTER_ID in $ENVIRONMENT"
+              
+              # Get tags for this cluster
+              TAGS=$(aws rds list-tags-for-resource \
+                --resource-name "$CLUSTER_ARN" \
+                --region $REGION \
+                --query 'TagList[?Key==`team` || Key==`powersave`].[Key,Value]' \
+                --output text)
+              
+              TEAM_TAG=""
+              POWERSAVE_TAG=""
+              
+              while IFS=$'\t' read -r TAG_KEY TAG_VALUE; do
+                if [ "$TAG_KEY" = "team" ] && [ "$TAG_VALUE" = "dna" ]; then
+                  TEAM_TAG="true"
+                elif [ "$TAG_KEY" = "powersave" ] && [ "$TAG_VALUE" = "true" ]; then
+                  POWERSAVE_TAG="true"
+                fi
+              done <<< "$TAGS"
+              
+              # Check if cluster should be stopped
+              if [ "$TEAM_TAG" = "true" ] && [ "$POWERSAVE_TAG" = "true" ]; then
+                echo "✅ Cluster $CLUSTER_ID in $ENVIRONMENT matches criteria (team=dna, powersave=true)"
+                
+                # Check current status
+                STATUS=$(aws rds describe-db-clusters \
+                  --db-cluster-identifier "$CLUSTER_ID" \
+                  --region $REGION \
+                  --query 'DBClusters[0].Status' \
+                  --output text)
+                
+                if [ "$STATUS" = "available" ]; then
+                  if [ "$DRY_RUN" = "true" ]; then
+                    echo "🔸 DRY RUN: Would stop cluster $CLUSTER_ID in $ENVIRONMENT"
+                  else
+                    echo "🛑 Stopping cluster $CLUSTER_ID in $ENVIRONMENT..."
+                    aws rds stop-db-cluster \
+                      --db-cluster-identifier "$CLUSTER_ID" \
+                      --region $REGION
+                    echo "✅ Successfully initiated stop for cluster $CLUSTER_ID in $ENVIRONMENT"
+                    STOPPED_CLUSTERS="$STOPPED_CLUSTERS$CLUSTER_ID,"
+                  fi
+                else
+                  echo "ℹ️  Cluster $CLUSTER_ID in $ENVIRONMENT is already in status: $STATUS"
+                fi
+              else
+                echo "❌ Cluster $CLUSTER_ID in $ENVIRONMENT does not match criteria"
+              fi
+            fi
+          done <<< "$CLUSTERS"
+          
+          # Stop EC2 Instances for this environment
+          echo "🔍 Finding EC2 instances in $ENVIRONMENT..."
+          
+          INSTANCES=$(aws ec2 describe-instances \
+            --region $REGION \
+            --filters \
+              "Name=tag:team,Values=dna" \
+              "Name=tag:powersave,Values=true" \
+              "Name=instance-state-name,Values=running" \
+            --query 'Reservations[].Instances[].{InstanceId:InstanceId,Name:Tags[?Key==`Name`].Value|[0],State:State.Name}' \
+            --output json)
+          
+          STOPPED_INSTANCES=""
+          
+          # Parse JSON and stop instances
+          echo "$INSTANCES" | jq -r '.[] | "\(.InstanceId) \(.Name // "unnamed") \(.State)"' | while read -r INSTANCE_ID INSTANCE_NAME STATE; do
+            if [ -n "$INSTANCE_ID" ]; then
+              echo "Found instance: $INSTANCE_ID ($INSTANCE_NAME) in $ENVIRONMENT - State: $STATE"
+              
+              if [ "$STATE" = "running" ]; then
+                if [ "$DRY_RUN" = "true" ]; then
+                  echo "🔸 DRY RUN: Would stop instance $INSTANCE_ID ($INSTANCE_NAME) in $ENVIRONMENT"
+                else
+                  echo "🛑 Stopping instance $INSTANCE_ID ($INSTANCE_NAME) in $ENVIRONMENT..."
+                  aws ec2 stop-instances \
+                    --instance-ids "$INSTANCE_ID" \
+                    --region $REGION
+                  echo "✅ Successfully initiated stop for instance $INSTANCE_ID ($INSTANCE_NAME) in $ENVIRONMENT"
+                  STOPPED_INSTANCES="$STOPPED_INSTANCES$INSTANCE_ID,"
+                fi
+              else
+                echo "ℹ️  Instance $INSTANCE_ID in $ENVIRONMENT is already in state: $STATE"
+              fi
+            fi
+          done
+          
+          # Set outputs for summary
+          if [ -n "$STOPPED_CLUSTERS" ]; then
+            echo "stopped_clusters=${STOPPED_CLUSTERS%,}" >> $GITHUB_OUTPUT
+          else
+            echo "stopped_clusters=none" >> $GITHUB_OUTPUT
+          fi
+          
+          if [ -n "$STOPPED_INSTANCES" ]; then
+            echo "stopped_instances=${STOPPED_INSTANCES%,}" >> $GITHUB_OUTPUT
+          else
+            echo "stopped_instances=none" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "✅ Completed processing for environment: $ENVIRONMENT"
+
+      - name: Environment Summary
+        run: |
+          echo "## PowerSave Shutdown - ${{ matrix.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ matrix.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Region:** ${{ github.event.inputs.aws_region || 'eu-west-2' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Dry Run:** ${{ github.event.inputs.dry_run || 'false' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Aurora PostgreSQL Clusters Stopped:" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.process_environment.outputs.stopped_clusters }}" = "none" ]; then
+            echo "- No clusters were stopped" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "${{ steps.process_environment.outputs.stopped_clusters }}" | tr ',' '\n' | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### EC2 Instances Stopped:" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.process_environment.outputs.stopped_instances }}" = "none" ]; then
+            echo "- No instances were stopped" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "${{ steps.process_environment.outputs.stopped_instances }}" | tr ',' '\n' | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "**Execution Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+
+  summary:
+    needs: [extract-environments, powersave-shutdown]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Overall Summary
+        run: |
+          echo "## PowerSave Shutdown - Overall Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Region:** ${{ github.event.inputs.aws_region || 'eu-west-2' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environments:** ${{ needs.extract-environments.outputs.environments }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Dry Run:** ${{ github.event.inputs.dry_run || 'false' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Results by Environment:" >> $GITHUB_STEP_SUMMARY
+          
+          # Check results for each environment
+          environments='${{ needs.extract-environments.outputs.environments }}'
+          echo "$environments" | jq -r '.[]' | while read -r env; do
+            if [ -n "$env" ]; then
+              echo "- **$env**: Check individual job results above" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Execution Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY 

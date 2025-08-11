@@ -1,0 +1,56 @@
+name: Manual Deploy (Production)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+        default: 'plan'
+      auto_approve:
+        description: 'Auto approve apply/destroy operations'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/terragrunt.yml
+    with:
+      module_path: lambda-build-module
+      environment: prod
+      action: ${{ github.event.inputs.action }}
+      auto_approve: ${{ github.event.inputs.auto_approve }}
+      aws_region: eu-west-2
+    secrets: inherit
+    
+  build-apply:
+    needs: build
+    if: github.event.inputs.action == 'apply' && needs.build.result == 'success'
+    uses: ./.github/workflows/terragrunt.yml
+    with:
+      module_path: lambda-build-module
+      environment: prod
+      action: apply
+      auto_approve: true
+      aws_region: eu-west-2
+    secrets: inherit
+    
+  deploy:
+    needs: [build, build-apply]
+    if: |
+      (github.event.inputs.action == 'plan' && needs.build.result == 'success') ||
+      (github.event.inputs.action == 'apply' && needs.build-apply.result == 'success')
+    uses: ./.github/workflows/terragrunt.yml
+    with:
+      module_path: lambda-deploy-module
+      environment: prod
+      action: ${{ github.event.inputs.action }}
+      auto_approve: ${{ github.event.inputs.auto_approve }}
+      aws_region: eu-west-2
+    secrets: inherit 

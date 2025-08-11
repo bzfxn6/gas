@@ -1,0 +1,12 @@
+{
+  "dev": {
+    "profile": "dev-sso-profile",
+    "eks_cluster_c": "dev-cluster-c",
+    "eks_cluster_w": "dev-cluster-w"
+  },
+  "int": {
+    "profile": "int-sso-profile",
+    "eks_cluster_c": "int-cluster-c",
+    "eks_cluster_w": "int-cluster-w"
+  }
+} 

@@ -1,0 +1,12 @@
+{
+  "name": "${PREFIX}-batch-queue",
+  "state": "ENABLED",
+  "priority": 1,
+  "compute_environment_order": [
+    {
+      "order": 0,
+      "compute_environment": "${PREFIX}-batch-compute"
+    }
+  ],
+  "tags": ${TAGS}
+} 

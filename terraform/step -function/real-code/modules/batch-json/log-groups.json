@@ -1,0 +1,12 @@
+{
+  "batch_validation": {
+    "name": "/aws/batch/${PREFIX}-batch-validation",
+    "retention_in_days": 30,
+    "tags": ${TAGS}
+  },
+  "batch_processing": {
+    "name": "/aws/batch/${PREFIX}-batch-processing",
+    "retention_in_days": 30,
+    "tags": ${TAGS}
+  }
+} 

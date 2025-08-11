@@ -1,0 +1,61 @@
+name: Lambda Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'code/**'
+      - 'lambda-json/**'
+      - 'lambda-build-module/**'
+      - 'lambda-deploy-module/**'
+      - '.github/workflows/lambda-pipeline.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'code/**'
+      - 'lambda-json/**'
+      - 'lambda-build-module/**'
+      - 'lambda-deploy-module/**'
+      - '.github/workflows/lambda-pipeline.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+jobs:
+  build:
+    uses: ./.github/workflows/terragrunt.yml
+    with:
+      module_path: lambda-build-module
+      environment: ${{ github.event.inputs.environment || 'dev' }}
+      action: plan
+    secrets: inherit
+    
+  build-apply:
+    needs: build
+    if: github.ref == 'refs/heads/main' && needs.build.result == 'success'
+    uses: ./.github/workflows/terragrunt.yml
+    with:
+      module_path: lambda-build-module
+      environment: ${{ github.event.inputs.environment || 'dev' }}
+      action: apply
+      auto_approve: true
+    secrets: inherit
+    
+  deploy:
+    needs: build-apply
+    if: github.ref == 'refs/heads/main' && needs.build-apply.result == 'success'
+    uses: ./.github/workflows/terragrunt.yml
+    with:
+      module_path: lambda-deploy-module
+      environment: ${{ github.event.inputs.environment || 'dev' }}
+      action: apply
+      auto_approve: true
+    secrets: inherit 

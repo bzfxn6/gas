@@ -1,0 +1,477 @@
+name: Initial Cluster Workflow
+ 
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Choose source branch'
+      env:
+        description: 'Chose which environment to update.'
+        required: true
+        default: 'gss-sandbox'  # Default branch name
+        type: choice
+        options:  # List of options available in the dropdown
+          - gss-sandbox
+          - gss-dev01
+          - gss-int
+          - absa-preprod
+          - absa-prod
+      aws_region:
+        description: 'Chose which region to update.'
+        required: true
+        default: 'eu-west-2'  # Default GSS region
+        type: choice
+        options:  # List of options available in the dropdown
+          - eu-west-2
+          - eu-west-1
+ 
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+ 
+jobs:
+  terragrunt_cd_plan:
+    runs-on: self-hosted
+    steps:
+      # Check out repo
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+     
+      # Check branch exists
+      - name: Check branch exists
+        id: check-branch-exists
+        uses: GuillaumeFalourd/branch-exists@v1
+        with:
+          branch: ${{ github.event.inputs.branch }}
+ 
+      # Exit with an error if branch doesnt exists
+      - if: steps.check-branch-exists.outputs.exists == 'false'
+        run: |
+          echo '${{ github.event.inputs.branch }} Branch NOT FOUND'
+          exit 1
+ 
+      # Install asdf and use .tools_versions in the repo to set terrafrom and terragrunt version
+      - name: instll asdf
+        uses: asdf-vm/actions/install@v3
+        with:
+          asdf_branch: v0.15.0
+ 
+      # Configure Python version
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+     
+      # Install pre-commit to perform lint tasks
+      - name: Install pre-commit
+        run: pip install pre-commit python-hcl2
+ 
+      # Extract AWS Account number from account.hcl
+      - name: Extract Env details
+        id: extract_env
+        run: |
+          echo ${{ github.event.inputs.env }}
+          python ./bin/pre-env-setup.py ${{ github.event.inputs.env }}
+ 
+      # Install tfcmt used to add the plan into the git
+      - uses: shirakiya/setup-tfcmt@v2
+        with:
+          version: v4.3.0
+ 
+      # AWS role to use for pipeline
+      - name: Configure AWS Creds
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ steps.extract_env.outputs.aws_account_number }}:role/${{ steps.extract_env.outputs.gss_account_name }}-gss-tuning-runner-ro-ci-role
+          aws-region: ${{ github.event.inputs.aws_region }}
+          role-skip-session-tagging: true
+          #role-duration-seconds: 10800
+     
+      # use envitoment name to set path in repo.
+      - name: Set replaced value as output
+        id: replace
+        run: |
+          ORIGINAL="${{ github.event.inputs.env }}"
+          REPLACED=$(echo $ORIGINAL | sed 's/-/\//g')
+          echo "replaced=$REPLACED" >> $GITHUB_OUTPUT
+ 
+      - name: Get Application Token
+        id:  get_app_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.PLATFORM_APP_ID }}
+          private-key: ${{ secrets.PLATFORM_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+ 
+      - name: Extend Git credentials
+        uses: de-vri-es/setup-git-credentials@v2
+        with:
+          credentials: https://user:${{ steps.get_app_token.outputs.token }}@github.com
+ 
+      # Ensure terraform code is valid
+      - name: Validate the terragrunt code
+        id: validate
+        run: |
+          terragrunt run-all validate --terragrunt-non-interactive --terragrunt-include-external-dependencies --terragrunt-working-dir terraform/${{ steps.replace.outputs.replaced }}/${{ github.event.inputs.aws_region }}/base-vpc/cluster --terragrunt-exclude-dir ./eks-config --terragrunt-exclude-dir ./rbac --terragrunt-exclude-dir ./ws-newyork
+          terragrunt validate --terragrunt-working-dir terraform/${{ steps.replace.outputs.replaced }}/${{ github.event.inputs.aws_region }}/base-vpc/neterium/neterium-token-secret
+     
+      - name: plan
+        id: plan
+ 
+        #run: tfcmt plan -- terragrunt run-all plan -out=/tmp/plan.tfplan
+        run: |
+            terragrunt run-all plan --terragrunt-non-interactive --terragrunt-include-external-dependencies --terragrunt-working-dir terraform/${{ steps.replace.outputs.replaced }}/${{ github.event.inputs.aws_region }}/base-vpc/cluster --terragrunt-exclude-dir  ./eks-config --terragrunt-exclude-dir ./rbac
+            terragrunt plan --terragrunt-working-dir terraform/${{ steps.replace.outputs.replaced }}/${{ github.event.inputs.aws_region }}/base-vpc/neterium/neterium-token-secret
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+ 
+  terragrunt_cd_deploy_cluster:
+      runs-on: self-hosted
+      needs: terragrunt_cd_plan
+      environment: ${{ contains('gss-sandbox,gss-dev01,gss-int', github.event.inputs.env) && 'gss-apply' || (github.event.inputs.env == 'absa-preprod' && 'apply-preprod' || 'apply-prod') }}
+      steps:
+      # Check out repo
+        - name: Checkout code
+          uses: actions/checkout@v4
+          with:
+            ref: ${{ github.head_ref }}
+   
+        # Install asdf and use .tools_versions in the repo to set terrafrom and terragrunt version
+        - name: instll asdf
+          uses: asdf-vm/actions/install@v3
+          with:
+            asdf_branch: v0.15.0
+ 
+        # Configure Python version
+        - name: Set up Python
+          uses: actions/setup-python@v5
+          with:
+            python-version: '3.11'
+ 
+        # Install pre-commit to perform lint tasks
+        - name: Install pre-commit
+          run: pip install pre-commit python-hcl2
+ 
+        - name: Extract Env details
+          id: extract_env
+          run: |
+            echo ${{ github.event.inputs.env }}
+            python ./bin/pre-env-setup.py ${{ github.event.inputs.env }}
+       
+        - name: Set replaced value as output
+          id: replace
+          run: |
+            ORIGINAL="${{ github.event.inputs.env }}"
+            REPLACED=$(echo $ORIGINAL | sed 's/-/\//g')
+            echo "replaced=$REPLACED" >> $GITHUB_OUTPUT
+ 
+        # Install tfcmt used to add the plan into the git
+        - uses: shirakiya/setup-tfcmt@v2
+          with:
+            version: v4.3.0
+ 
+        - name: Configure AWS Creds
+          uses: aws-actions/configure-aws-credentials@v4
+          with:
+            role-to-assume: arn:aws:iam::${{ steps.extract_env.outputs.aws_account_number }}:role/${{ steps.extract_env.outputs.gss_account_name }}-gss-tuning-runner-rw-cd-role
+            aws-region: ${{ github.event.inputs.aws_region }}
+            role-skip-session-tagging: true
+            #role-duration-seconds: 10800
+ 
+        - name: Get Application Token
+          id:  get_app_token
+          uses: actions/create-github-app-token@v1
+          with:
+            app-id: ${{ secrets.PLATFORM_APP_ID }}
+            private-key: ${{ secrets.PLATFORM_PRIVATE_KEY }}
+            owner: ${{ github.repository_owner }}
+ 
+        - name: Extend Git credentials
+          uses: de-vri-es/setup-git-credentials@v2
+          with:
+            credentials: https://user:${{ steps.get_app_token.outputs.token }}@github.com
+ 
+        - name: Deploy the terragrunt code into ${{ github.event.inputs.env }}
+          id: deploy
+          run: |
+            terragrunt run-all apply --terragrunt-non-interactive --terragrunt-exclude-dir ./eks-config --terragrunt-include-external-dependencies --terragrunt-working-dir terraform/${{ steps.replace.outputs.replaced }}/${{ github.event.inputs.aws_region }}/base-vpc/cluster
+            # terragrunt apply -auto-approve  --terragrunt-working-dir terraform/${{ steps.replace.outputs.replaced }}/${{ github.event.inputs.aws_region }}/base-vpc/cluster/rbac
+            # terragrunt apply -auto-approve  --terragrunt-working-dir terraform/${{ steps.replace.outputs.replaced }}/${{ github.event.inputs.aws_region }}/base-vpc/cluster/eks-config
+            terragrunt apply -auto-approve --terragrunt-working-dir terraform/${{ steps.replace.outputs.replaced }}/${{ github.event.inputs.aws_region }}/base-vpc/neterium/neterium-token-secret
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+
+  terragrunt_post_cluster_apply_cd_plan:
+    needs: terragrunt_cd_deploy_cluster
+    runs-on: self-hosted
+    # environment:
+    #   name: ${{ github.event.inputs.env }}-ci
+    steps:
+      # Check out repo
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+ 
+      # Install asdf and use .tools_versions in the repo to set terrafrom and terragrunt version
+      - name: instll asdf
+        uses: asdf-vm/actions/install@v3
+        with:
+            asdf_branch: v0.15.0
+   
+      # Configure Python version
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+       
+      # Install pre-commit to perform lint tasks
+      - name: Install pre-commit
+        run: pip install pre-commit python-hcl2
+ 
+      # Extract AWS Account number from account.hcl
+      - name: Extract Env details
+        id: extract_env
+        run: |
+          echo ${{ github.event.inputs.env }}
+          python ./bin/pre-env-setup.py ${{ github.event.inputs.env }}
+ 
+      # Install tfcmt used to add the plan into the git
+      - uses: shirakiya/setup-tfcmt@v2
+        with:
+          version: v4.3.0
+ 
+      # AWS role to use for pipeline
+      - name: Configure AWS Creds
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ steps.extract_env.outputs.aws_account_number }}:role/${{ steps.extract_env.outputs.gss_account_name }}-gss-tuning-runner-ro-ci-role
+          aws-region: ${{ github.event.inputs.aws_region }}
+          role-skip-session-tagging: true
+          #role-duration-seconds: 10800
+       
+      - name: Set replaced value as output
+        id: replace
+        run: |
+          ORIGINAL="${{ github.event.inputs.env }}"
+          REPLACED=$(echo $ORIGINAL | sed 's/-/\//g')
+          echo "replaced=$REPLACED" >> $GITHUB_OUTPUT
+ 
+      - name: Get Application Token
+        id:  get_app_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.PLATFORM_APP_ID }}
+          private-key: ${{ secrets.PLATFORM_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+ 
+      - name: Extend Git credentials
+        uses: de-vri-es/setup-git-credentials@v2
+        with:
+          credentials: https://user:${{ steps.get_app_token.outputs.token }}@github.com
+       
+      - name: plan
+        id: plan
+ 
+        #run: tfcmt plan -- terragrunt run-all plan -out=/tmp/plan.tfplan
+        run: |
+          # terragrunt run-all plan --terragrunt-non-interactive --terragrunt-include-external-dependencies --terragrunt-working-dir terraform/${{ steps.replace.outputs.replaced }}/${{ github.event.inputs.aws_region }}/base-vpc/cluster
+          terragrunt run-all plan --terragrunt-non-interactive --terragrunt-include-external-dependencies --terragrunt-working-dir terraform/${{ steps.replace.outputs.replaced }}/${{ github.event.inputs.aws_region }}/base-vpc/cluster/rbac
+          terragrunt run-all plan --terragrunt-non-interactive --terragrunt-include-external-dependencies --terragrunt-working-dir terraform/${{ steps.replace.outputs.replaced }}/${{ github.event.inputs.aws_region }}/base-vpc/cluster/eks-config
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+ 
+  terragrunt_cd_deploy_post_cluster:
+    runs-on: self-hosted
+    needs: terragrunt_post_cluster_apply_cd_plan
+    environment: ${{ contains('gss-sandbox,gss-dev01,gss-int', github.event.inputs.env) && 'gss-apply' || (github.event.inputs.env == 'absa-preprod' && 'apply-preprod' || 'apply-prod') }}
+    steps:
+     # Check out repo
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+           
+      # Install asdf and use .tools_versions in the repo to set terrafrom and terragrunt version
+      - name: instll asdf
+        uses: asdf-vm/actions/install@v3
+        with:
+            asdf_branch: v0.15.0
+       
+      # Configure Python version
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+       
+      # Install pre-commit to perform lint tasks
+      - name: Install pre-commit
+        run: pip install pre-commit python-hcl2
+       
+      - name: Extract Env details
+        id: extract_env
+        run: |
+          echo ${{ github.event.inputs.env }}
+          python ./bin/pre-env-setup.py ${{ github.event.inputs.env }}
+               
+      - name: Set replaced value as output
+        id: replace
+        run: |
+          ORIGINAL="${{ github.event.inputs.env }}"
+          REPLACED=$(echo $ORIGINAL | sed 's/-/\//g')
+          echo "replaced=$REPLACED" >> $GITHUB_OUTPUT
+       
+      # Install tfcmt used to add the plan into the git
+      - uses: shirakiya/setup-tfcmt@v2
+        with:
+          version: v4.3.0
+       
+      - name: Configure AWS Creds
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ steps.extract_env.outputs.aws_account_number }}:role/${{ steps.extract_env.outputs.gss_account_name }}-gss-tuning-runner-rw-cd-role
+          aws-region: ${{ github.event.inputs.aws_region }}
+          role-skip-session-tagging: true
+          #role-duration-seconds: 10800
+       
+      - name: Get Application Token
+        id:  get_app_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.PLATFORM_APP_ID }}
+          private-key: ${{ secrets.PLATFORM_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+       
+      - name: Extend Git credentials
+        uses: de-vri-es/setup-git-credentials@v2
+        with:
+          credentials: https://user:${{ steps.get_app_token.outputs.token }}@github.com
+       
+      - name: Deploy the terragrunt code into ${{ github.event.inputs.env }}
+        id: deploy
+        run: |
+          terragrunt run-all apply --terragrunt-non-interactive --terragrunt-include-external-dependencies --terragrunt-working-dir terraform/${{ steps.replace.outputs.replaced }}/${{ github.event.inputs.aws_region }}/base-vpc/cluster
+          # terragrunt apply -auto-approve  --terragrunt-working-dir terraform/${{ steps.replace.outputs.replaced }}/${{ github.event.inputs.aws_region }}/base-vpc/cluster/rbac
+          # terragrunt apply -auto-approve  --terragrunt-working-dir terraform/${{ steps.replace.outputs.replaced }}/${{ github.event.inputs.aws_region }}/base-vpc/cluster/eks-config
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+       
+  approve_deployment:
+    runs-on: self-hosted
+    needs: [terragrunt_cd_deploy_post_cluster]
+    name: "Read plan status in job summary"
+    steps:
+      - name: Echo
+        run: |
+          echo "Read plan status in job summary"
+          echo "Read the README.md for more information, but deploy Nexus secret to EKS before continuing"
+ 
+  helm_cd_deploy_cluster:
+    runs-on: self-hosted
+    needs: approve_deployment
+    environment: ${{ contains('gss-sandbox,gss-dev01,gss-int', github.event.inputs.env) && 'gss-apply' || (github.event.inputs.env == 'absa-preprod' && 'apply-preprod' || 'apply-prod') }}
+    steps:
+    # Check out repo
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+ 
+      # Install asdf and use .tools_versions in the repo to set terrafrom and terragrunt version
+      - name: instll asdf
+        uses: asdf-vm/actions/install@v3
+ 
+      # Configure Python version
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+ 
+      # Install pre-commit to perform lint tasks
+      - name: Install pre-commit
+        run: pip install pre-commit python-hcl2
+ 
+      - name: Extract Env details
+        id: extract_env
+        run: |
+          echo ${{ github.event.inputs.env }}
+          python ./bin/pre-env-setup.py ${{ github.event.inputs.env }}
+     
+      - name: Set replaced value as output
+        id: replace
+        run: |
+          ORIGINAL="${{ github.event.inputs.env }}"
+          REPLACED=$(echo $ORIGINAL | sed 's/-/\//g')
+          echo "replaced=$REPLACED" >> $GITHUB_OUTPUT
+ 
+      # Install tfcmt used to add the plan into the git
+      - uses: shirakiya/setup-tfcmt@v2
+        with:
+          version: v4.3.0
+ 
+      # Set role to assume
+      - name: set role due to differences in environments
+        id: role_to_assume
+        run: |
+          if [[ "${{ github.event.inputs.env }}" == "gss-sandbox" || "${{ github.event.inputs.env }}" == "gss-dev01" ]]; then
+            echo "role-to-assume=arn:aws:iam::${{ steps.extract_env.outputs.aws_account_number }}:role/${{ steps.extract_env.outputs.gss_account_name }}-base-helm-dev-pipeline" >> $GITHUB_OUTPUT
+            echo "role-to-assume=arn:aws:iam::${{ steps.extract_env.outputs.aws_account_number }}:role/${{ steps.extract_env.outputs.gss_account_name }}-base-helm-dev-pipeline"
+          else
+            echo "role-to-assume=arn:aws:iam::${{ steps.extract_env.outputs.aws_account_number }}:role/gss-helm-dev-pipeline" >> $GITHUB_OUTPUT
+            echo "role-to-assume=arn:aws:iam::${{ steps.extract_env.outputs.aws_account_number }}:role/gss-helm-dev-pipeline"
+          fi
+ 
+      - name: Configure AWS Creds
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          #role-to-assume: arn:aws:iam::${{ steps.extract_env.outputs.aws_account_number }}:role/${{ steps.extract_env.outputs.gss_account_name }}-base-helm-dev-pipeline
+          role-to-assume: ${{ steps.role_to_assume.outputs.role-to-assume }}
+          aws-region: ${{ github.event.inputs.aws_region }}
+          role-skip-session-tagging: true
+          #role-duration-seconds: 10800
+ 
+      - name: Get Application Token
+        id:  get_app_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.PLATFORM_APP_ID }}
+          private-key: ${{ secrets.PLATFORM_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+     
+      - name: Setup helmfile
+        uses: mamezou-tech/setup-helmfile@v2.0.0
+ 
+      - name: Extend Git credentials
+        uses: de-vri-es/setup-git-credentials@v2
+        with:
+          credentials: https://user:${{ steps.get_app_token.outputs.token }}@github.com
+     
+      - name: Login to EKS
+        run: |
+          aws eks update-kubeconfig --name ${{ github.event.inputs.env }}-workspaces --region ${{ github.event.inputs.aws_region }}
+          kubectl config view
+ 
+      - name: kubectl
+        run: |
+          kubectl get pods --all-namespaces
+ 
+      - name: EKS $${{ github.event.inputs.env }}-workspaces
+        working-directory: helm/environments/${{ steps.replace.outputs.replaced }}
+        run: |
+          helmfile deps --file helmfile.yaml
+          helmfile sync --validate --file helmfile.yaml
+        env:
+          HELM_USER_NAME: ${{ secrets.HELM_USER_NAME }}
+          HELM_USER_PWD: ${{ secrets.HELM_USER_PWD }}
+     
+      - name: Logs
+        if: failure()
+        run: |
+          kubectl get pods --no-headers --all-namespaces | awk '!/(Running|Succeeded|Completed)/' | awk '!/gss-system-tests/'|  awk '{print $1, $2}' | while read -r namespace pod; do
+            echo ${pod}; kubectl logs -n ${namespace} --all-containers --ignore-errors ${pod}
+          done

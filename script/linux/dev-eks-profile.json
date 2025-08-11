@@ -1,0 +1,5 @@
+{
+  "profile": "dev-sso-profile",
+  "eks_cluster_c": "dev-cluster-c",
+  "eks_cluster_w": "dev-cluster-w"
+} 
