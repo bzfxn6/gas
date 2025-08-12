@@ -1,0 +1,39 @@
+{
+  "web-server": {
+    "name": "web-server",
+    "region": "us-east-1",
+    "alarms": ["cpu_utilization", "network_in", "network_out", "status_check_failed"],
+    "exclude_alarms": ["disk_read_bytes", "disk_write_bytes", "ebs_read_bytes", "ebs_write_bytes"],
+    "custom_alarms": {
+      "strict-cpu-utilization": {
+        "alarm_name": "web-server-strict-cpu-utilization",
+        "comparison_operator": "GreaterThanThreshold",
+        "evaluation_periods": 1,
+        "metric_name": "CPUUtilization",
+        "namespace": "AWS/EC2",
+        "period": 300,
+        "statistic": "Average",
+        "threshold": 70,
+        "alarm_description": "Web server CPU utilization is above 70%",
+        "dimensions": [
+          {
+            "name": "InstanceId",
+            "value": "i-1234567890abcdef0"
+          }
+        ]
+      }
+    }
+  },
+  "database-server": {
+    "name": "database-server",
+    "region": "us-east-1",
+    "alarms": ["cpu_utilization", "memory_utilization", "disk_read_bytes", "disk_write_bytes", "ebs_read_bytes", "ebs_write_bytes"],
+    "custom_alarms": {}
+  },
+  "batch-processor": {
+    "name": "batch-processor",
+    "region": "us-east-1",
+    "alarms": ["cpu_utilization", "cpu_credit_balance", "memory_utilization"],
+    "custom_alarms": {}
+  }
+}

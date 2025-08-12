@@ -1,0 +1,38 @@
+{
+  "events-queue": {
+    "name": "events-queue",
+    "region": "us-east-1",
+    "alarms": ["queue_depth", "message_age"],
+    "custom_alarms": {
+      "high-queue-depth": {
+        "alarm_name": "events-queue-high-depth",
+        "comparison_operator": "GreaterThanThreshold",
+        "evaluation_periods": 2,
+        "metric_name": "ApproximateNumberOfVisibleMessages",
+        "namespace": "AWS/SQS",
+        "period": 300,
+        "statistic": "Average",
+        "threshold": 500,
+        "alarm_description": "Events queue has more than 500 visible messages",
+        "dimensions": [
+          {
+            "name": "QueueName",
+            "value": "events-queue"
+          }
+        ]
+      }
+    }
+  },
+  "notifications-queue": {
+    "name": "notifications-queue",
+    "region": "us-east-1",
+    "alarms": ["queue_depth", "message_age", "error_rate"],
+    "custom_alarms": {}
+  },
+  "dead-letter-queue": {
+    "name": "dead-letter-queue",
+    "region": "us-east-1",
+    "alarms": ["queue_depth"],
+    "custom_alarms": {}
+  }
+}

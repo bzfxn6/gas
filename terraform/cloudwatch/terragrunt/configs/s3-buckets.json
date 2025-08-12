@@ -1,0 +1,43 @@
+{
+  "application-data": {
+    "name": "application-data-bucket",
+    "region": "us-east-1",
+    "alarms": ["bucket_size_bytes", "number_of_objects", "errors_4xx", "errors_5xx"],
+    "custom_alarms": {
+      "strict-bucket-size": {
+        "alarm_name": "application-data-strict-bucket-size",
+        "comparison_operator": "GreaterThanThreshold",
+        "evaluation_periods": 1,
+        "metric_name": "BucketSizeBytes",
+        "namespace": "AWS/S3",
+        "period": 86400,
+        "statistic": "Average",
+        "threshold": 500000000000,
+        "alarm_description": "Application data bucket size is above 500GB",
+        "dimensions": [
+          {
+            "name": "BucketName",
+            "value": "application-data-bucket"
+          },
+          {
+            "name": "StorageType",
+            "value": "StandardStorage"
+          }
+        ]
+      }
+    }
+  },
+  "user-uploads": {
+    "name": "user-uploads-bucket",
+    "region": "us-east-1",
+    "alarms": ["all_requests", "get_requests", "put_requests", "bytes_downloaded", "bytes_uploaded"],
+    "custom_alarms": {}
+  },
+  "backup-storage": {
+    "name": "backup-storage-bucket",
+    "region": "us-east-1",
+    "alarms": ["bucket_size_bytes", "number_of_objects"],
+    "exclude_alarms": ["first_byte_latency", "total_request_latency"],
+    "custom_alarms": {}
+  }
+}

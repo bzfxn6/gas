@@ -1,0 +1,45 @@
+{
+  "web-app": {
+    "name": "web-app",
+    "cluster_name": "main-cluster",
+    "region": "us-east-1",
+    "alarms": ["cpu_utilization", "memory_utilization", "running_task_count"],
+    "custom_alarms": {
+      "strict-cpu-utilization": {
+        "alarm_name": "web-app-strict-cpu-utilization",
+        "comparison_operator": "GreaterThanThreshold",
+        "evaluation_periods": 1,
+        "metric_name": "CPUUtilization",
+        "namespace": "AWS/ECS",
+        "period": 300,
+        "statistic": "Average",
+        "threshold": 70,
+        "alarm_description": "Web app CPU utilization is above 70%",
+        "dimensions": [
+          {
+            "name": "ServiceName",
+            "value": "web-app"
+          },
+          {
+            "name": "ClusterName",
+            "value": "main-cluster"
+          }
+        ]
+      }
+    }
+  },
+  "api-service": {
+    "name": "api-service",
+    "cluster_name": "main-cluster",
+    "region": "us-east-1",
+    "alarms": ["cpu_utilization", "memory_utilization", "running_task_count"],
+    "custom_alarms": {}
+  },
+  "worker-service": {
+    "name": "worker-service",
+    "cluster_name": "worker-cluster",
+    "region": "us-east-1",
+    "alarms": ["cpu_utilization", "memory_utilization"],
+    "custom_alarms": {}
+  }
+}

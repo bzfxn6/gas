@@ -1,0 +1,45 @@
+{
+  "main-database": {
+    "name": "main-database",
+    "region": "us-east-1",
+    "customer": "enbd-preprod",
+    "team": "DNA",
+    "alarms": ["cpu_utilization", "memory_utilization", "database_connections"],
+    "exclude_alarms": ["read_latency", "write_latency"],
+    "custom_alarms": {
+      "strict-cpu-utilization": {
+        "alarm_name": "Sev2/enbd-preprod/DNA/RDS/CPU/strict-cpu-utilization-above-70%",
+        "comparison_operator": "GreaterThanThreshold",
+        "evaluation_periods": 1,
+        "metric_name": "CPUUtilization",
+        "namespace": "AWS/RDS",
+        "period": 300,
+        "statistic": "Average",
+        "threshold": 70,
+        "alarm_description": "Main database CPU utilization is above 70%",
+        "dimensions": [
+          {
+            "name": "DBInstanceIdentifier",
+            "value": "main-database"
+          }
+        ]
+      }
+    }
+  },
+  "read-replica": {
+    "name": "read-replica",
+    "region": "us-east-1",
+    "customer": "enbd-preprod",
+    "team": "DNA",
+    "alarms": ["database_connections", "read_latency"],
+    "custom_alarms": {}
+  },
+  "analytics-db": {
+    "name": "analytics-database",
+    "region": "us-east-1",
+    "customer": "enbd-preprod",
+    "team": "DNA",
+    "exclude_alarms": ["write_latency"],
+    "custom_alarms": {}
+  }
+}

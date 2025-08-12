@@ -1,0 +1,45 @@
+{
+  "api-function": {
+    "name": "api-function",
+    "region": "us-east-1",
+    "customer": "enbd-preprod",
+    "team": "DNA",
+    "alarms": ["errors", "duration", "throttles"],
+    "exclude_alarms": ["concurrent_executions"],
+    "custom_alarms": {
+      "strict-error-rate": {
+        "alarm_name": "Sev1/enbd-preprod/DNA/Lambda/Errors/strict-error-rate",
+        "comparison_operator": "GreaterThanThreshold",
+        "evaluation_periods": 1,
+        "metric_name": "Errors",
+        "namespace": "AWS/Lambda",
+        "period": 300,
+        "statistic": "Sum",
+        "threshold": 0,
+        "alarm_description": "API function has errors",
+        "dimensions": [
+          {
+            "name": "FunctionName",
+            "value": "api-function"
+          }
+        ]
+      }
+    }
+  },
+  "data-processor": {
+    "name": "data-processor",
+    "region": "us-east-1",
+    "customer": "enbd-preprod",
+    "team": "DNA",
+    "alarms": ["errors", "duration"],
+    "custom_alarms": {}
+  },
+  "worker-function": {
+    "name": "worker-function",
+    "region": "us-east-1",
+    "customer": "enbd-preprod",
+    "team": "DNA",
+    "exclude_alarms": ["concurrent_executions"],
+    "custom_alarms": {}
+  }
+}

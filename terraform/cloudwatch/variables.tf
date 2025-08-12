@@ -27,6 +27,30 @@ variable "common_tags" {
   }
 }
 
+# Alarm naming convention variables
+variable "customer" {
+  description = "Customer name for alarm naming convention"
+  type        = string
+  default     = "enbd-preprod"
+}
+
+variable "team" {
+  description = "Team name for alarm naming convention"
+  type        = string
+  default     = "DNA"
+}
+
+variable "severity_levels" {
+  description = "Mapping of severity levels to alarm naming convention"
+  type        = map(string)
+  default = {
+    high   = "Sev1"
+    medium = "Sev2"
+    low    = "Sev3"
+    info   = "Sev4"
+  }
+}
+
 # Dashboard variables
 variable "dashboards" {
   description = "Map of CloudWatch dashboards to create"
@@ -141,6 +165,8 @@ variable "default_monitoring" {
     # Single database (simplified)
     database = optional(object({
       name = string
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
       alarms = optional(list(string), [])  # Which alarms to include (empty = all)
       exclude_alarms = optional(list(string), [])  # Which alarms to exclude
       custom_alarms = optional(map(any), {})
@@ -150,6 +176,8 @@ variable "default_monitoring" {
     # Multiple databases (map)
     databases = optional(map(object({
       name = string
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
       alarms = optional(list(string), [])  # Which alarms to include (empty = all)
       exclude_alarms = optional(list(string), [])  # Which alarms to exclude
       custom_alarms = optional(map(any), {})
@@ -159,6 +187,8 @@ variable "default_monitoring" {
     # Single lambda (simplified)
     lambda = optional(object({
       name = string
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
       alarms = optional(list(string), [])  # Which alarms to include (empty = all)
       exclude_alarms = optional(list(string), [])  # Which alarms to exclude
       custom_alarms = optional(map(any), {})
@@ -168,6 +198,8 @@ variable "default_monitoring" {
     # Multiple lambdas (map)
     lambdas = optional(map(object({
       name = string
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
       alarms = optional(list(string), [])  # Which alarms to include (empty = all)
       exclude_alarms = optional(list(string), [])  # Which alarms to exclude
       custom_alarms = optional(map(any), {})
@@ -177,6 +209,8 @@ variable "default_monitoring" {
     # Single SQS queue (simplified)
     sqs_queue = optional(object({
       name = string
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
       alarms = optional(list(string), [])  # Which alarms to include (empty = all)
       exclude_alarms = optional(list(string), [])  # Which alarms to exclude
       custom_alarms = optional(map(any), {})
@@ -186,6 +220,8 @@ variable "default_monitoring" {
     # Multiple SQS queues (map)
     sqs_queues = optional(map(object({
       name = string
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
       alarms = optional(list(string), [])  # Which alarms to include (empty = all)
       exclude_alarms = optional(list(string), [])  # Which alarms to exclude
       custom_alarms = optional(map(any), {})
@@ -196,6 +232,8 @@ variable "default_monitoring" {
     ecs_service = optional(object({
       name = string
       cluster_name = string
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
       alarms = optional(list(string), [])  # Which alarms to include (empty = all)
       exclude_alarms = optional(list(string), [])  # Which alarms to exclude
       custom_alarms = optional(map(any), {})
@@ -206,6 +244,8 @@ variable "default_monitoring" {
     ecs_services = optional(map(object({
       name = string
       cluster_name = string
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
       alarms = optional(list(string), [])  # Which alarms to include (empty = all)
       exclude_alarms = optional(list(string), [])  # Which alarms to exclude
       custom_alarms = optional(map(any), {})
@@ -226,6 +266,8 @@ variable "default_monitoring" {
     eks_clusters = optional(map(object({
       name = string
       region = optional(string, "us-east-1")
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
       alarms = optional(list(string), [])  # Which alarms to include (empty = all)
       exclude_alarms = optional(list(string), [])  # Which alarms to exclude
       custom_alarms = optional(map(any), {})
@@ -238,6 +280,8 @@ variable "default_monitoring" {
       namespace = optional(string, "default")
       cluster_name = string
       region = optional(string, "us-east-1")
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
       alarms = optional(list(string), [])  # Which alarms to include (empty = all)
       exclude_alarms = optional(list(string), [])  # Which alarms to exclude
       custom_alarms = optional(map(any), {})
@@ -250,6 +294,36 @@ variable "default_monitoring" {
       namespace = optional(string, "default")
       cluster_name = string
       region = optional(string, "us-east-1")
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
+      alarms = optional(list(string), [])  # Which alarms to include (empty = all)
+      exclude_alarms = optional(list(string), [])  # Which alarms to exclude
+      custom_alarms = optional(map(any), {})
+      custom_metrics = optional(list(any), [])
+    })), {})
+    
+    # Single EKS node group (simplified)
+    eks_nodegroup = optional(object({
+      name = string
+      cluster_name = string
+      asg_name = optional(string)  # Auto Scaling Group name for EC2 metrics
+      region = optional(string, "us-east-1")
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
+      alarms = optional(list(string), [])  # Which alarms to include (empty = all)
+      exclude_alarms = optional(list(string), [])  # Which alarms to exclude
+      custom_alarms = optional(map(any), {})
+      custom_metrics = optional(list(any), [])
+    }))
+    
+    # Multiple EKS node groups (map)
+    eks_nodegroups = optional(map(object({
+      name = string
+      cluster_name = string
+      asg_name = optional(string)  # Auto Scaling Group name for EC2 metrics
+      region = optional(string, "us-east-1")
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
       alarms = optional(list(string), [])  # Which alarms to include (empty = all)
       exclude_alarms = optional(list(string), [])  # Which alarms to exclude
       custom_alarms = optional(map(any), {})
@@ -261,6 +335,8 @@ variable "default_monitoring" {
       name = string
       arn = optional(string)
       region = optional(string, "us-east-1")
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
       alarms = optional(list(string), [])  # Which alarms to include (empty = all)
       exclude_alarms = optional(list(string), [])  # Which alarms to exclude
       custom_alarms = optional(map(any), {})
@@ -272,6 +348,8 @@ variable "default_monitoring" {
       name = string
       arn = optional(string)
       region = optional(string, "us-east-1")
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
       alarms = optional(list(string), [])  # Which alarms to include (empty = all)
       exclude_alarms = optional(list(string), [])  # Which alarms to exclude
       custom_alarms = optional(map(any), {})
@@ -283,6 +361,8 @@ variable "default_monitoring" {
       name = string
       instance_id = optional(string)
       region = optional(string, "us-east-1")
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
       alarms = optional(list(string), [])  # Which alarms to include (empty = all)
       exclude_alarms = optional(list(string), [])  # Which alarms to exclude
       custom_alarms = optional(map(any), {})
@@ -294,6 +374,8 @@ variable "default_monitoring" {
       name = string
       instance_id = optional(string)
       region = optional(string, "us-east-1")
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
       alarms = optional(list(string), [])  # Which alarms to include (empty = all)
       exclude_alarms = optional(list(string), [])  # Which alarms to exclude
       custom_alarms = optional(map(any), {})
@@ -304,6 +386,8 @@ variable "default_monitoring" {
     s3_bucket = optional(object({
       name = string
       region = optional(string, "us-east-1")
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
       alarms = optional(list(string), [])  # Which alarms to include (empty = all)
       exclude_alarms = optional(list(string), [])  # Which alarms to exclude
       custom_alarms = optional(map(any), {})
@@ -314,11 +398,97 @@ variable "default_monitoring" {
     s3_buckets = optional(map(object({
       name = string
       region = optional(string, "us-east-1")
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
       alarms = optional(list(string), [])  # Which alarms to include (empty = all)
       exclude_alarms = optional(list(string), [])  # Which alarms to exclude
       custom_alarms = optional(map(any), {})
       custom_metrics = optional(list(any), [])
-    }), {})
+    })), {})
+    
+    # Single EventBridge rule (simplified)
+    eventbridge_rule = optional(object({
+      name = string
+      region = optional(string, "us-east-1")
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
+      alarms = optional(list(string), [])  # Which alarms to include (empty = all)
+      exclude_alarms = optional(list(string), [])  # Which alarms to exclude
+      custom_alarms = optional(map(any), {})
+      custom_metrics = optional(list(any), [])
+    }))
+    
+    # Multiple EventBridge rules (map)
+    eventbridge_rules = optional(map(object({
+      name = string
+      region = optional(string, "us-east-1")
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
+      alarms = optional(list(string), [])  # Which alarms to include (empty = all)
+      exclude_alarms = optional(list(string), [])  # Which alarms to exclude
+      custom_alarms = optional(map(any), {})
+      custom_metrics = optional(list(any), [])
+    })), {})
+    
+    # Single log-based alarm (simplified)
+    log_alarm = optional(object({
+      log_group_name = string
+      pattern = string
+      transformation_name = string
+      transformation_namespace = string
+      transformation_value = string
+      default_value = optional(string, "0")
+      alarm_description = string
+      comparison_operator = string
+      evaluation_periods = number
+      period = number
+      statistic = string
+      threshold = number
+      treat_missing_data = optional(string, "notBreaching")
+      unit = optional(string, "Count")
+      severity = optional(string, "Sev2")
+      sub_service = optional(string, "Custom")
+      error_details = optional(string, "log-pattern-detected")
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
+      alarm_actions = optional(list(string), [])
+      ok_actions = optional(list(string), [])
+      insufficient_data_actions = optional(list(string), [])
+      dimensions = optional(list(object({
+        name  = string
+        value = string
+      })), [])
+    }))
+    
+    # Multiple log-based alarms (map)
+    log_alarms = optional(map(object({
+      log_group_name = string
+      pattern = string
+      transformation_name = string
+      transformation_namespace = string
+      transformation_value = string
+      default_value = optional(string, "0")
+      alarm_description = string
+      comparison_operator = string
+      evaluation_periods = number
+      period = number
+      statistic = string
+      threshold = number
+      treat_missing_data = optional(string, "notBreaching")
+      unit = optional(string, "Count")
+      severity = optional(string, "Sev2")
+      sub_service = optional(string, "Custom")
+      error_details = optional(string, "log-pattern-detected")
+      customer = optional(string)  # Customer for alarm naming (defaults to var.customer)
+      team = optional(string)      # Team for alarm naming (defaults to var.team)
+      alarm_actions = optional(list(string), [])
+      ok_actions = optional(list(string), [])
+      insufficient_data_actions = optional(list(string), [])
+      dimensions = optional(list(object({
+        name  = string
+        value = string
+      })), [])
+    })), {})
   })
   default = {}
 }

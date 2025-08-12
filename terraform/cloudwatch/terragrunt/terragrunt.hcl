@@ -2,337 +2,197 @@ terraform {
   source = "../"
 }
 
+# Terragrunt configuration for CloudWatch monitoring
+# This configuration reads monitoring settings from JSON files
+
 locals {
-  local_dashboard_directory  = "${get_terragrunt_dir()}/dashboards"
-  shared_dashboard_directory = "${get_terragrunt_dir()}/../../shared/dashboards"
-
-  # Load dashboard configurations from JSON files
-  dashboards = merge(
-    merge([
-      for dashboard_file in fileset(local.local_dashboard_directory, "*.json") :
-      merge([
-        {
-          for dashboard_key, dashboard_config in jsondecode(templatefile("${local.local_dashboard_directory}/${dashboard_file}", {
-            environment = local.environment
-            region      = local.region
-            project     = local.project
-          })) :
-          "${trimsuffix(dashboard_file, ".json")}-${dashboard_key}" => {
-            name           = dashboard_config.name
-            dashboard_body = jsonencode(dashboard_config.dashboard_body)
-            type           = dashboard_config.type != null ? dashboard_config.type : "custom"
-            tags           = dashboard_config.tags != null ? dashboard_config.tags : {}
-            linked_dashboards = dashboard_config.linked_dashboards != null ? dashboard_config.linked_dashboards : []
-          }
-        }
-      ]...)
-    ]...),
-    merge([
-      for dashboard_file in fileset(local.shared_dashboard_directory, "*.json") :
-      merge([
-        {
-          for dashboard_key, dashboard_config in jsondecode(templatefile("${local.shared_dashboard_directory}/${dashboard_file}", {
-            environment = local.environment
-            region      = local.region
-            project     = local.project
-          })) :
-          "shared-${trimsuffix(dashboard_file, ".json")}-${dashboard_key}" => {
-            name           = dashboard_config.name
-            dashboard_body = jsonencode(dashboard_config.dashboard_body)
-            type           = dashboard_config.type != null ? dashboard_config.type : "custom"
-            tags           = dashboard_config.tags != null ? dashboard_config.tags : {}
-            linked_dashboards = dashboard_config.linked_dashboards != null ? dashboard_config.linked_dashboards : []
-          }
-        }
-      ]...)
-    ]...)
-  )
-
-  # Default monitoring configuration
+  environment = "production"
+  region     = "us-east-1"
+  project    = "my-app"
+  
+  # Alarm naming convention variables
+  customer = "enbd-preprod"  # Default customer - can be overridden in JSON
+  team     = "DNA"           # Default team - can be overridden in JSON
+  
+  # Severity mapping
+  severity_levels = {
+    high   = "Sev1"
+    medium = "Sev2"
+    low    = "Sev3"
+    info   = "Sev4"
+  }
+  
+  # Read monitoring configurations from JSON files
+  databases_config = jsondecode(file("${get_terragrunt_dir()}/configs/databases.json"))
+  lambdas_config = jsondecode(file("${get_terragrunt_dir()}/configs/lambdas.json"))
+  sqs_queues_config = jsondecode(file("${get_terragrunt_dir()}/configs/sqs-queues.json"))
+  ecs_services_config = jsondecode(file("${get_terragrunt_dir()}/configs/ecs-services.json"))
+  eks_clusters_config = jsondecode(file("${get_terragrunt_dir()}/configs/eks-clusters.json"))
+  eks_pods_config = jsondecode(file("${get_terragrunt_dir()}/configs/eks-pods.json"))
+  eks_nodegroups_config = jsondecode(file("${get_terragrunt_dir()}/configs/eks-nodegroups.json"))
+  step_functions_config = jsondecode(file("${get_terragrunt_dir()}/configs/step-functions.json"))
+  ec2_instances_config = jsondecode(file("${get_terragrunt_dir()}/configs/ec2-instances.json"))
+  s3_buckets_config = jsondecode(file("${get_terragrunt_dir()}/configs/s3-buckets.json"))
+  eventbridge_rules_config = jsondecode(file("${get_terragrunt_dir()}/configs/eventbridge-rules.json"))
+  log_alarms_config = jsondecode(file("${get_terragrunt_dir()}/configs/log-alarms.json"))
+  
+  # Merge configurations with environment variables and default values
   default_monitoring = {
-    # Add your databases here
-    databases = {
-      main-database = {
-        name = "main-${local.environment}-database"
-      }
-      read-replica = {
-        name = "read-replica-${local.environment}"
-      }
-      analytics-db = {
-        name = "analytics-${local.environment}-db"
-      }
-    }
+    databases = merge(
+      local.databases_config,
+      { for k, v in local.databases_config : k => merge(v, { 
+        name = "${v.name}-${local.environment}",
+        customer = coalesce(v.customer, local.customer),
+        team = coalesce(v.team, local.team)
+      }) }
+    )
     
-    # Add your Lambda functions here
-    lambdas = {
-      api-function = {
-        name = "api-${local.environment}-function"
-      }
-      data-processor = {
-        name = "data-processor-${local.environment}"
-      }
-    }
+    lambdas = merge(
+      local.lambdas_config,
+      { for k, v in local.lambdas_config : k => merge(v, { 
+        name = "${v.name}-${local.environment}",
+        customer = coalesce(v.customer, local.customer),
+        team = coalesce(v.team, local.team)
+      }) }
+    )
     
-    # Add your SQS queues here
-    sqs_queues = {
-      events-queue = {
-        name = "events-${local.environment}-queue"
-      }
-      notifications-queue = {
-        name = "notifications-${local.environment}-queue"
-      }
-    }
+    sqs_queues = merge(
+      local.sqs_queues_config,
+      { for k, v in local.sqs_queues_config : k => merge(v, { 
+        name = "${v.name}-${local.environment}",
+        customer = coalesce(v.customer, local.customer),
+        team = coalesce(v.team, local.team)
+      }) }
+    )
     
-    # Add your ECS services here
-    ecs_services = {
-      web-app = {
-        name = "web-${local.environment}-app"
-        cluster_name = "${local.environment}-cluster"
-      }
-      api-service = {
-        name = "api-${local.environment}-service"
-        cluster_name = "${local.environment}-cluster"
-      }
-    }
+    ecs_services = merge(
+      local.ecs_services_config,
+      { for k, v in local.ecs_services_config : k => merge(v, { 
+        name = "${v.name}-${local.environment}",
+        cluster_name = "${v.cluster_name}-${local.environment}",
+        customer = coalesce(v.customer, local.customer),
+        team = coalesce(v.team, local.team)
+      }) }
+    )
     
-    # Add your EKS clusters here
-    eks_clusters = {
-      main-cluster = {
-        name = "main-${local.environment}-eks-cluster"
-        region = local.region
-      }
-      secondary-cluster = {
-        name = "secondary-${local.environment}-eks-cluster"
-        region = local.region
-      }
-    }
+    eks_clusters = merge(
+      local.eks_clusters_config,
+      { for k, v in local.eks_clusters_config : k => merge(v, { 
+        name = "${v.name}-${local.environment}",
+        customer = coalesce(v.customer, local.customer),
+        team = coalesce(v.team, local.team)
+      }) }
+    )
     
-    # Add your EKS pods/apps here
-    eks_pods = {
-      web-app-pod = {
-        name = "web-${local.environment}-app-pod"
-        namespace = "web"
-        cluster_name = "main-${local.environment}-eks-cluster"
-        region = local.region
-      }
-      api-pod = {
-        name = "api-${local.environment}-pod"
-        namespace = "api"
-        cluster_name = "main-${local.environment}-eks-cluster"
-        region = local.region
-      }
-      database-pod = {
-        name = "database-${local.environment}-pod"
-        namespace = "database"
-        cluster_name = "main-${local.environment}-eks-cluster"
-        region = local.region
-      }
-    }
+    eks_pods = merge(
+      local.eks_pods_config,
+      { for k, v in local.eks_pods_config : k => merge(v, { 
+        name = "${v.name}-${local.environment}",
+        cluster_name = "${v.cluster_name}-${local.environment}",
+        customer = coalesce(v.customer, local.customer),
+        team = coalesce(v.team, local.team)
+      }) }
+    )
     
-    # Add your Step Functions here
-    step_functions = {
-      main-workflow = {
-        name = "main-${local.environment}-workflow"
-        region = local.region
-        # ARN will be auto-generated if not provided
-      }
-      data-pipeline = {
-        name = "data-${local.environment}-pipeline"
-        region = local.region
-      }
-      notification-service = {
-        name = "notification-${local.environment}-service"
-        region = local.region
-      }
-    }
+    eks_nodegroups = merge(
+      local.eks_nodegroups_config,
+      { for k, v in local.eks_nodegroups_config : k => merge(v, { 
+        name = "${v.name}-${local.environment}",
+        cluster_name = "${v.cluster_name}-${local.environment}",
+        customer = coalesce(v.customer, local.customer),
+        team = coalesce(v.team, local.team)
+      }) }
+    )
     
-    # Add your EC2 instances here
-    ec2_instances = {
-      web-server = {
-        name = "web-${local.environment}-server"
-        region = local.region
-        # Instance ID will be auto-generated if not provided
-      }
-      database-server = {
-        name = "database-${local.environment}-server"
-        region = local.region
-      }
-      batch-processor = {
-        name = "batch-${local.environment}-processor"
-        region = local.region
-      }
-    }
+    step_functions = merge(
+      local.step_functions_config,
+      { for k, v in local.step_functions_config : k => merge(v, { 
+        name = "${v.name}-${local.environment}",
+        customer = coalesce(v.customer, local.customer),
+        team = coalesce(v.team, local.team)
+      }) }
+    )
     
-    # Add your S3 buckets here
-    s3_buckets = {
-      application-data = {
-        name = "application-${local.environment}-data"
-        region = local.region
-      }
-      user-uploads = {
-        name = "user-${local.environment}-uploads"
-        region = local.region
-      }
-      backup-storage = {
-        name = "backup-${local.environment}-storage"
-        region = local.region
-      }
-    }
+    ec2_instances = merge(
+      local.ec2_instances_config,
+      { for k, v in local.ec2_instances_config : k => merge(v, { 
+        name = "${v.name}-${local.environment}",
+        customer = coalesce(v.customer, local.customer),
+        team = coalesce(v.team, local.team)
+      }) }
+    )
+    
+    s3_buckets = merge(
+      local.s3_buckets_config,
+      { for k, v in local.s3_buckets_config : k => merge(v, { 
+        name = "${v.name}-${local.environment}",
+        customer = coalesce(v.customer, local.customer),
+        team = coalesce(v.team, local.team)
+      }) }
+    )
+    
+    eventbridge_rules = merge(
+      local.eventbridge_rules_config,
+      { for k, v in local.eventbridge_rules_config : k => merge(v, { 
+        name = "${v.name}-${local.environment}",
+        customer = coalesce(v.customer, local.customer),
+        team = coalesce(v.team, local.team)
+      }) }
+    )
+    
+    log_alarms = merge(
+      local.log_alarms_config,
+      { for k, v in local.log_alarms_config : k => merge(v, { 
+        customer = coalesce(v.customer, local.customer),
+        team = coalesce(v.team, local.team)
+      }) }
+    )
   }
-
-  # Custom alarms configuration
-  alarms = {
-    # Add custom alarms here
-    high-error-rate = {
-      alarm_name          = "high-error-rate-${local.environment}"
-      comparison_operator = "GreaterThanThreshold"
-      evaluation_periods  = 2
-      metric_name         = "ErrorRate"
-      namespace           = "CustomMetrics"
-      period              = 300
-      statistic           = "Average"
-      threshold           = 5.0
-      alarm_description   = "Error rate is above 5% in ${local.environment}"
-      treat_missing_data = "notBreaching"
-      unit                = "Percent"
-      alarm_actions       = ["arn:aws:sns:${local.region}:${local.account_id}:alerts-topic"]
-    }
-  }
-
-  # Log groups configuration
-  log_groups = {
-    app-logs = {
-      name               = "/aws/lambda/app-${local.environment}-logs"
-      retention_in_days  = 30
-      tags = {
-        Service = "application"
-        LogType = "lambda"
-      }
-    }
-    access-logs = {
-      name               = "/aws/applicationloadbalancer/access-logs-${local.environment}"
-      retention_in_days  = 90
-      tags = {
-        Service = "load-balancer"
-        LogType = "access"
-      }
-    }
-  }
-
-  # Event rules configuration
-  event_rules = {
-    maintenance-window = {
-      name                = "maintenance-window-${local.environment}"
-      description         = "Scheduled maintenance window for ${local.environment}"
-      schedule_expression = "cron(0 2 ? * SUN *)"  # Every Sunday at 2 AM
-      is_enabled          = true
-      tags = {
-        Service = "maintenance"
-        Type    = "scheduled"
-      }
-    }
-  }
-
-  # Dashboard linking configuration
-  dashboard_links = {
-    overview_dashboard = {
-      name = "overview-${local.environment}"
-      description = "Overview dashboard for ${local.environment} environment"
-      include_all_alarms = true
-      include_all_metrics = true
-      custom_widgets = [
-        {
-          type   = "text"
-          x      = 0
-          y      = 6
-          width  = 24
-          height = 3
-          properties = {
-            markdown = "# ${title(local.environment)} Environment Overview\n\nThis dashboard provides a comprehensive view of all monitored resources in the ${local.environment} environment."
+  
+  # Dashboard configuration
+  dashboards = {
+    overview = {
+      dashboard_name = "${local.environment}-infrastructure-overview"
+      dashboard_body = jsonencode({
+        widgets = [
+          {
+            type   = "alarm"
+            x      = 0
+            y      = 0
+            width  = 24
+            height = 6
+            properties = {
+              title = "Infrastructure Alarm Status Overview"
+              alarms = []  # Will be populated dynamically
+            }
           }
-        }
-      ]
-    }
-    
-    link_groups = {
-      application = {
-        name = "Application Monitoring - ${title(local.environment)}"
-        dashboards = ["app-overview", "business-metrics"]
-        description = "Dashboards for application and business metrics in ${local.environment}"
-      }
-      infrastructure = {
-        name = "Infrastructure Monitoring - ${title(local.environment)}"
-        dashboards = ["overview-${local.environment}"]
-        description = "Infrastructure and alarm status dashboards for ${local.environment}"
-      }
+        ]
+      })
     }
   }
-
-  region      = "us-east-1"
-  environment = "dev"
-  project     = "gas"
-  account_id  = "123456789012"  # Replace with your actual AWS account ID
 }
 
-inputs = {
-  # Common configuration
-  region      = local.region
-  environment = local.environment
-  project     = local.project
+# Call the CloudWatch module
+module "cloudwatch" {
+  source = "../../terraform/cloudwatch"
   
-  # Common tags
+  region = local.region
+  environment = local.environment
+  project = local.project
+  
+  default_monitoring = local.default_monitoring
+  dashboards = local.dashboards
+  
+  # Pass alarm naming convention variables
+  customer = local.customer
+  team = local.team
+  severity_levels = local.severity_levels
+  
   common_tags = {
     Environment = local.environment
     Project     = local.project
     ManagedBy   = "terragrunt"
-    Owner       = "devops-team"
+    Customer    = local.customer
+    Team        = local.team
   }
-  
-  # Default monitoring (automatic alarms and metrics)
-  default_monitoring = local.default_monitoring
-  
-  # Custom dashboards
-  dashboards = local.dashboards
-  
-  # Custom alarms
-  alarms = local.alarms
-  
-  # Log groups
-  log_groups = local.log_groups
-  
-  # Event rules
-  event_rules = local.event_rules
-  
-  # Dashboard linking
-  dashboard_links = local.dashboard_links
-}
-
-# Optional: Configure AWS provider
-# Uncomment and modify if you need specific AWS provider configuration
-# generate "provider" {
-#   path      = "provider.tf"
-#   if_exists = "overwrite_terragrunt"
-#   contents  = <<EOF
-# provider "aws" {
-#   region = "us-east-1"
-#   # Add any other provider configuration here
-# }
-# EOF
-# }
-
-# Optional: Configure backend for state management
-# Uncomment and modify if you want to use remote state
-# remote_state {
-#   backend = "s3"
-#   config = {
-#     bucket         = "your-terraform-state-bucket"
-#     key            = "cloudwatch-dashboards/terraform.tfstate"
-#     region         = "us-east-1"
-#     encrypt        = true
-#     dynamodb_table = "terraform-locks"
-#   }
-#   generate = {
-#     path      = "backend.tf"
-#     if_exists = "overwrite_terragrunt"
-#   }
-# } 
+} 

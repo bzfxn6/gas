@@ -1,0 +1,39 @@
+{
+  "order-events": {
+    "name": "order-events-rule",
+    "region": "us-east-1",
+    "alarms": ["failed_invocations", "dead_letter_invocations", "delivery_failed", "target_errors"],
+    "custom_alarms": {
+      "strict-failed-invocations": {
+        "alarm_name": "order-events-strict-failed-invocations",
+        "comparison_operator": "GreaterThanThreshold",
+        "evaluation_periods": 1,
+        "metric_name": "FailedInvocations",
+        "namespace": "AWS/Events",
+        "period": 300,
+        "statistic": "Sum",
+        "threshold": 0,
+        "alarm_description": "Order events rule has failed invocations",
+        "dimensions": [
+          {
+            "name": "RuleName",
+            "value": "order-events-rule"
+          }
+        ]
+      }
+    }
+  },
+  "notification-events": {
+    "name": "notification-events-rule",
+    "region": "us-east-1",
+    "alarms": ["failed_invocations", "dead_letter_invocations", "delivery_failed"],
+    "custom_alarms": {}
+  },
+  "data-processing": {
+    "name": "data-processing-rule",
+    "region": "us-east-1",
+    "alarms": ["failed_invocations", "dead_letter_invocations", "delivery_failed", "target_errors", "delivery_duration"],
+    "exclude_alarms": ["replay_failed", "replay_canceled", "replay_events"],
+    "custom_alarms": {}
+  }
+}

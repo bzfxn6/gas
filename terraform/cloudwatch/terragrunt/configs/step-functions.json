@@ -1,0 +1,39 @@
+{
+  "main-workflow": {
+    "name": "main-workflow",
+    "region": "us-east-1",
+    "alarms": ["execution_success_rate", "execution_failure_rate", "execution_time"],
+    "custom_alarms": {
+      "strict-execution-time": {
+        "alarm_name": "main-workflow-strict-execution-time",
+        "comparison_operator": "GreaterThanThreshold",
+        "evaluation_periods": 1,
+        "metric_name": "ExecutionTime",
+        "namespace": "AWS/States",
+        "period": 300,
+        "statistic": "Average",
+        "threshold": 120000,
+        "alarm_description": "Main workflow execution time is above 2 minutes",
+        "dimensions": [
+          {
+            "name": "StateMachineArn",
+            "value": "arn:aws:states:us-east-1:123456789012:stateMachine:main-workflow"
+          }
+        ]
+      }
+    }
+  },
+  "data-pipeline": {
+    "name": "data-pipeline",
+    "region": "us-east-1",
+    "alarms": ["execution_success_rate", "execution_failure_rate", "execution_time", "activity_failed"],
+    "custom_alarms": {}
+  },
+  "notification-service": {
+    "name": "notification-service",
+    "region": "us-east-1",
+    "alarms": ["execution_success_rate", "execution_failure_rate"],
+    "exclude_alarms": ["execution_time", "activity_failed"],
+    "custom_alarms": {}
+  }
+}

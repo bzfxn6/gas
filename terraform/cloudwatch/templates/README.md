@@ -29,6 +29,23 @@ Provides monitoring for individual EKS pods/applications:
 - **Pod Container Count**: Triggers when pod has no running containers
 - **Pod Ready Status**: Triggers when pod is not ready
 
+### EKS Node Groups Template (`eks-nodegroups.tf`)
+Provides comprehensive monitoring for EKS node groups:
+- **Node Group Health**: Monitors overall node group health status
+- **Node Count**: Alerts when node count drops below minimum threshold
+- **Scaling Activity**: Detects when node group is scaling up/down
+- **Capacity Utilization**: Monitors node group capacity usage
+- **Instance Health**: Alerts on unhealthy instances in the node group
+- **Launch Template Version**: Detects version mismatches
+- **Update Status**: Monitors node group update operations
+- **Auto Scaling Group Health**: Monitors underlying ASG health
+- **Spot Instance Interruption**: Detects spot instance interruptions
+- **Instance Type Utilization**: Monitors specific instance type usage
+- **EC2 Status Checks**: Monitors EC2 instance and system status checks
+- **EC2 CPU Utilization**: Monitors EC2 instance CPU usage
+- **EBS Operations**: Monitors EBS IO balance, read/write operations
+- **Comprehensive Dashboards**: Multiple widget types for node group metrics including EC2 metrics
+
 ### Step Functions Template (`step-functions.tf`)
 Provides comprehensive monitoring for AWS Step Functions:
 - **Execution Monitoring**: Success rate, failures, throttling, time, aborts, timeouts
@@ -56,6 +73,14 @@ Provides comprehensive monitoring for AWS S3 buckets:
 - **Multipart Upload Monitoring**: Count, parts, and bytes
 - **Comprehensive Dashboards**: Multiple widget types for different S3 metrics
 
+### EventBridge Template (`eventbridge.tf`)
+Provides comprehensive monitoring for AWS EventBridge rules:
+- **Rule Performance**: Triggered rules, invocations, failures
+- **Delivery Monitoring**: Delivery success/failure, duration, target errors
+- **Event Flow**: Sent, received, and dropped events
+- **Replay Monitoring**: Replay events, failures, and cancellations
+- **Comprehensive Dashboards**: Multiple widget types for different EventBridge metrics
+
 ### Main Template (`main.tf`)
 Combines all templates and provides final outputs:
 - Merges all default alarms from all templates
@@ -81,6 +106,12 @@ module "cloudwatch" {
       web-app = {
         name = "web-app-pod"
         namespace = "web"
+        cluster_name = "main-eks-cluster"
+      }
+    }
+    eks_nodegroups = {
+      main-nodegroup = {
+        name = "main-nodegroup"
         cluster_name = "main-eks-cluster"
       }
     }

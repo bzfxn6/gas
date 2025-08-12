@@ -1,0 +1,52 @@
+{
+  "web-app-pod": {
+    "name": "web-app-pod",
+    "namespace": "web",
+    "cluster_name": "main-eks-cluster",
+    "region": "us-east-1",
+    "alarms": ["pod_cpu_utilization", "pod_memory_utilization"],
+    "custom_alarms": {
+      "strict-pod-cpu": {
+        "alarm_name": "web-app-pod-strict-cpu",
+        "comparison_operator": "GreaterThanThreshold",
+        "evaluation_periods": 1,
+        "metric_name": "pod_cpu_utilization",
+        "namespace": "ContainerInsights",
+        "period": 300,
+        "statistic": "Average",
+        "threshold": 60,
+        "alarm_description": "Web app pod CPU utilization is above 60%",
+        "dimensions": [
+          {
+            "name": "PodName",
+            "value": "web-app-pod"
+          },
+          {
+            "name": "Namespace",
+            "value": "web"
+          },
+          {
+            "name": "ClusterName",
+            "value": "main-eks-cluster"
+          }
+        ]
+      }
+    }
+  },
+  "api-pod": {
+    "name": "api-pod",
+    "namespace": "api",
+    "cluster_name": "main-eks-cluster",
+    "region": "us-east-1",
+    "alarms": ["pod_cpu_utilization", "pod_memory_utilization", "pod_restart_count"],
+    "custom_alarms": {}
+  },
+  "database-pod": {
+    "name": "database-pod",
+    "namespace": "database",
+    "cluster_name": "main-eks-cluster",
+    "region": "us-east-1",
+    "alarms": ["pod_cpu_utilization", "pod_memory_utilization", "pod_network_rx_bytes", "pod_network_tx_bytes"],
+    "custom_alarms": {}
+  }
+}

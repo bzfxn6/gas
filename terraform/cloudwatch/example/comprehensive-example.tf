@@ -231,6 +231,53 @@ module "cloudwatch_comprehensive" {
       }
     }
     
+    # EKS node groups monitoring - just add names and get default alarms/metrics
+    eks_nodegroups = {
+      production-main = {
+        name = "production-main-nodegroup"
+        cluster_name = "production-eks-cluster"
+        asg_name = "eks-production-eks-cluster-production-main-nodegroup-20231201"
+        region = "us-east-1"
+        # Custom alarms for this specific node group
+        custom_alarms = {
+          strict-node-count = {
+            alarm_name          = "production-main-strict-node-count"
+            comparison_operator = "LessThanThreshold"
+            evaluation_periods  = 1
+            metric_name         = "node_count"
+            namespace           = "AWS/EKS"
+            period              = 300
+            statistic           = "Average"
+            threshold           = 3
+            alarm_description   = "Production main node group has fewer than 3 nodes"
+            dimensions = [
+              {
+                name  = "ClusterName"
+                value = "production-eks-cluster"
+              },
+              {
+                name  = "NodegroupName"
+                value = "production-main-nodegroup"
+              }
+            ]
+          }
+        }
+      }
+      production-spot = {
+        name = "production-spot-nodegroup"
+        cluster_name = "production-eks-cluster"
+        asg_name = "eks-production-eks-cluster-production-spot-nodegroup-20231201"
+        region = "us-east-1"
+        alarms = ["nodegroup_health", "node_count", "spot_interruption", "status_check_failed", "cpu_utilization"]
+      }
+      staging-main = {
+        name = "staging-main-nodegroup"
+        cluster_name = "staging-eks-cluster"
+        asg_name = "eks-staging-eks-cluster-staging-main-nodegroup-20231201"
+        region = "us-east-1"
+      }
+    }
+    
     # Step Function monitoring - just add names and get default alarms/metrics
     step_functions = {
       order-processing = {
@@ -352,6 +399,114 @@ module "cloudwatch_comprehensive" {
       backup-storage = {
         name = "backup-storage-bucket"
         region = "us-east-1"
+      }
+    }
+    
+    # EventBridge rule monitoring - just add names and get default alarms/metrics
+    eventbridge_rules = {
+      order-events = {
+        name = "order-events-rule"
+        region = "us-east-1"
+        # Custom alarms for this specific EventBridge rule
+        custom_alarms = {
+          strict-failed-invocations = {
+            alarm_name          = "order-events-strict-failed-invocations"
+            comparison_operator = "GreaterThanThreshold"
+            evaluation_periods  = 1
+            metric_name         = "FailedInvocations"
+            namespace           = "AWS/Events"
+            period              = 300
+            statistic           = "Sum"
+            threshold           = 0
+            alarm_description   = "Order events rule has failed invocations"
+            dimensions = [
+              {
+                name  = "RuleName"
+                value = "order-events-rule"
+              }
+            ]
+          }
+        }
+      }
+      
+      notification-events = {
+        name = "notification-events-rule"
+        region = "us-east-1"
+      }
+      
+      data-processing = {
+        name = "data-processing-rule"
+        region = "us-east-1"
+      }
+    }
+    
+    # Log-based alarm monitoring
+    log_alarms = {
+      api-error-pattern = {
+        log_group_name = "/aws/lambda/api-function"
+        pattern = "[timestamp, level=ERROR, message]"
+        transformation_name = "APIErrorCount"
+        transformation_namespace = "CustomMetrics"
+        transformation_value = "1"
+        default_value = "0"
+        alarm_description = "Error log pattern detected in API function logs"
+        comparison_operator = "GreaterThanThreshold"
+        evaluation_periods = 1
+        period = 300
+        statistic = "Sum"
+        threshold = 0
+        treat_missing_data = "notBreaching"
+        unit = "Count"
+        severity = "Sev1"
+        sub_service = "Errors"
+        error_details = "api-error-pattern-detected"
+        customer = "enbd-preprod"
+        team = "DNA"
+        alarm_actions = ["arn:aws:sns:us-east-1:123456789012:alerts-topic"]
+      }
+      
+      high-latency-pattern = {
+        log_group_name = "/aws/lambda/api-function"
+        pattern = "[timestamp, level=INFO, message=*latency*, duration=*]"
+        transformation_name = "HighLatencyCount"
+        transformation_namespace = "CustomMetrics"
+        transformation_value = "1"
+        default_value = "0"
+        alarm_description = "High latency requests detected in API function logs"
+        comparison_operator = "GreaterThanThreshold"
+        evaluation_periods = 2
+        period = 300
+        statistic = "Sum"
+        threshold = 5
+        treat_missing_data = "notBreaching"
+        unit = "Count"
+        severity = "Sev2"
+        sub_service = "Performance"
+        error_details = "high-latency-requests-detected"
+        customer = "enbd-preprod"
+        team = "DNA"
+      }
+      
+      auth-failures = {
+        log_group_name = "/aws/applicationloadbalancer/access-logs"
+        pattern = "[timestamp, client_ip, target_ip, request_processing_time, target_processing_time, response_processing_time, elb_status_code, target_status_code, received_bytes, sent_bytes, request, user_agent, ssl_cipher, ssl_protocol, target_group_arn, trace_id, domain_name, chosen_cert_arn, matched_rule_priority, request_creation_time, actions_executed, redirect_url, lambda_error_reason, target_port_list, target_status_code_list, classification, classification_reason]"
+        transformation_name = "AuthFailureCount"
+        transformation_namespace = "CustomMetrics"
+        transformation_value = "1"
+        default_value = "0"
+        alarm_description = "Authentication failures detected in ALB access logs"
+        comparison_operator = "GreaterThanThreshold"
+        evaluation_periods = 1
+        period = 300
+        statistic = "Sum"
+        threshold = 10
+        treat_missing_data = "notBreaching"
+        unit = "Count"
+        severity = "Sev1"
+        sub_service = "Security"
+        error_details = "authentication-failures-detected"
+        customer = "enbd-preprod"
+        team = "DNA"
       }
     }
   }

@@ -48,6 +48,14 @@ module "cloudwatch_simple" {
       }
     }
     
+    # EKS node groups monitoring - just add names and get default monitoring
+    eks_nodegroups = {
+      main-nodegroup = {
+        name = "main-nodegroup"
+        cluster_name = "main-eks-cluster"
+      }
+    }
+    
     # Step Function monitoring - just add names and get default monitoring
     step_functions = {
       main-workflow = {
@@ -69,6 +77,31 @@ module "cloudwatch_simple" {
       main-bucket = {
         name = "main-bucket"
         region = "us-east-1"
+      }
+    }
+    
+    # EventBridge rule monitoring - just add names and get default monitoring
+    eventbridge_rules = {
+      main-rule = {
+        name = "main-rule"
+        region = "us-east-1"
+      }
+    }
+    
+    # Log-based alarm monitoring
+    log_alarms = {
+      error-pattern = {
+        log_group_name = "/aws/lambda/api-function"
+        pattern = "[timestamp, level=ERROR, message]"
+        transformation_name = "ErrorCount"
+        transformation_namespace = "CustomMetrics"
+        transformation_value = "1"
+        alarm_description = "Error log pattern detected"
+        comparison_operator = "GreaterThanThreshold"
+        evaluation_periods = 1
+        period = 300
+        statistic = "Sum"
+        threshold = 0
       }
     }
   }

@@ -1,0 +1,38 @@
+{
+  "main-cluster": {
+    "name": "main-eks-cluster",
+    "region": "us-east-1",
+    "alarms": ["cluster_cpu_utilization", "cluster_memory_utilization", "cluster_node_count"],
+    "custom_alarms": {
+      "strict-cluster-cpu": {
+        "alarm_name": "main-cluster-strict-cpu",
+        "comparison_operator": "GreaterThanThreshold",
+        "evaluation_periods": 1,
+        "metric_name": "node_cpu_utilization",
+        "namespace": "ContainerInsights",
+        "period": 300,
+        "statistic": "Average",
+        "threshold": 70,
+        "alarm_description": "Main cluster CPU utilization is above 70%",
+        "dimensions": [
+          {
+            "name": "ClusterName",
+            "value": "main-eks-cluster"
+          }
+        ]
+      }
+    }
+  },
+  "secondary-cluster": {
+    "name": "secondary-eks-cluster",
+    "region": "us-east-1",
+    "alarms": ["cluster_cpu_utilization", "cluster_memory_utilization"],
+    "custom_alarms": {}
+  },
+  "staging-cluster": {
+    "name": "staging-eks-cluster",
+    "region": "us-east-1",
+    "alarms": ["cluster_cpu_utilization", "cluster_memory_utilization", "cluster_node_count"],
+    "custom_alarms": {}
+  }
+}

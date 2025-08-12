@@ -98,6 +98,33 @@ module "cloudwatch" {
         name = "production-eks-cluster"
         # Monitor everything for production
       }
+    }
+    
+    # EKS node groups with selective monitoring
+    eks_nodegroups = {
+      production-main = {
+        name = "production-main-nodegroup"
+        cluster_name = "production-eks-cluster"
+        asg_name = "eks-production-eks-cluster-production-main-nodegroup-20231201"
+        # Only monitor health, node count, and EC2 metrics
+        alarms = ["nodegroup_health", "node_count", "status_check_failed", "cpu_utilization", "ebs_io_balance"]
+      }
+      
+      production-spot = {
+        name = "production-spot-nodegroup"
+        cluster_name = "production-eks-cluster"
+        asg_name = "eks-production-eks-cluster-production-spot-nodegroup-20231201"
+        # Monitor everything except launch template version
+        exclude_alarms = ["launch_template_version"]
+      }
+      
+      staging-main = {
+        name = "staging-main-nodegroup"
+        cluster_name = "staging-eks-cluster"
+        asg_name = "eks-staging-eks-cluster-staging-main-nodegroup-20231201"
+        # Only monitor critical metrics for staging
+        alarms = ["nodegroup_health", "node_count", "status_check_failed"]
+      }
       
       staging-cluster = {
         name = "staging-eks-cluster"

@@ -1,0 +1,28 @@
+{
+  "simple-error-pattern": {
+    "log_group_name": "/aws/lambda/my-function",
+    "pattern": "[timestamp, level=ERROR, message]",
+    "transformation_name": "ErrorCount",
+    "transformation_namespace": "CustomMetrics",
+    "transformation_value": "1",
+    "alarm_description": "Error log pattern detected",
+    "comparison_operator": "GreaterThanThreshold",
+    "evaluation_periods": 1,
+    "period": 300,
+    "statistic": "Sum",
+    "threshold": 0
+  },
+  "simple-latency-pattern": {
+    "log_group_name": "/aws/lambda/my-function",
+    "pattern": "[timestamp, level=INFO, message=*latency*, duration=*]",
+    "transformation_name": "HighLatencyCount",
+    "transformation_namespace": "CustomMetrics",
+    "transformation_value": "1",
+    "alarm_description": "High latency requests detected",
+    "comparison_operator": "GreaterThanThreshold",
+    "evaluation_periods": 2,
+    "period": 300,
+    "statistic": "Sum",
+    "threshold": 5
+  }
+}

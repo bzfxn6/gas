@@ -95,6 +95,22 @@ resource "aws_cloudwatch_log_group" "log_group" {
   )
 }
 
+# CloudWatch Log Metric Filters
+resource "aws_cloudwatch_log_metric_filter" "log_metric_filter" {
+  for_each = local.log_metric_filters
+  
+  name           = each.value.name
+  pattern        = each.value.pattern
+  log_group_name = each.value.log_group_name
+  
+  metric_transformation {
+    name          = each.value.metric_transformation[0].name
+    namespace     = each.value.metric_transformation[0].namespace
+    value         = each.value.metric_transformation[0].value
+    default_value = each.value.metric_transformation[0].default_value
+  }
+}
+
 # CloudWatch Event Rules
 resource "aws_cloudwatch_event_rule" "event_rule" {
   for_each = var.event_rules

@@ -294,6 +294,27 @@ When you add an EKS pod/app to `default_monitoring.eks_pods`, the module automat
 - **Pod Network Receive Alarm**: Triggers when pod network receive > 1GB
 - **Pod Network Transmit Alarm**: Triggers when pod network transmit > 1GB
 
+### EKS Node Group Monitoring
+
+When you add an EKS node group to `default_monitoring.eks_nodegroups`, the module automatically creates:
+
+- **Node Group Health Alarm**: Triggers when node group health check fails
+- **Node Count Alarm**: Triggers when node count drops below 1
+- **Scaling Activity Alarm**: Detects when node group is scaling up/down
+- **Capacity Utilization Alarm**: Triggers when capacity utilization > 85%
+- **Instance Health Alarm**: Triggers when node group has unhealthy instances
+- **Launch Template Version Alarm**: Detects version mismatches
+- **Update Status Alarm**: Monitors node group update operations
+- **Auto Scaling Group Health Alarm**: Monitors underlying ASG health
+- **Spot Instance Interruption Alarm**: Detects spot instance interruptions
+- **Instance Type Utilization Alarm**: Triggers when instance type utilization > 90%
+- **EC2 Status Check Failed Alarm**: Triggers when EC2 instance status check fails
+- **EC2 System Status Check Failed Alarm**: Triggers when EC2 system status check fails
+- **EC2 CPU Utilization Alarm**: Triggers when EC2 CPU > 80%
+- **EBS IO Balance Alarm**: Triggers when EBS IO balance < 20%
+- **EBS Read Operations Alarm**: Triggers when EBS read ops > 200 per 5 minutes
+- **EBS Write Operations Alarm**: Triggers when EBS write ops > 200 per 5 minutes
+
 ### Step Function Monitoring
 
 When you add a Step Function to `default_monitoring.step_functions`, the module automatically creates:
@@ -365,6 +386,69 @@ When you add an S3 bucket to `default_monitoring.s3_buckets`, the module automat
 - **Multipart Upload Parts Alarm**: Triggers when multipart upload parts > 1,000 per 5 minutes
 - **Multipart Upload Bytes Alarm**: Triggers when multipart upload bytes > 1GB per 5 minutes
 
+### EventBridge Monitoring
+
+When you add an EventBridge rule to `default_monitoring.eventbridge_rules`, the module automatically creates:
+
+- **Failed Invocations Alarm**: Triggers when invocations fail
+- **Dead Letter Invocations Alarm**: Triggers when events go to dead letter queue
+- **Throttled Rules Alarm**: Triggers when rules are throttled
+- **Triggered Rules Alarm**: Triggers when > 1,000 rules triggered per 5 minutes
+- **Invocations Alarm**: Triggers when > 1,000 invocations per 5 minutes
+- **Delivery Failed Alarm**: Triggers when event delivery fails
+- **Delivery Duration Alarm**: Triggers when delivery duration > 5 seconds
+- **Target Errors Alarm**: Triggers when target errors occur
+- **Target Duration Alarm**: Triggers when target duration > 30 seconds
+- **Sent Events Alarm**: Triggers when > 1,000 events sent per 5 minutes
+- **Received Events Alarm**: Triggers when > 1,000 events received per 5 minutes
+- **Dropped Events Alarm**: Triggers when events are dropped
+- **Replay Failed Alarm**: Triggers when replay fails
+- **Replay Canceled Alarm**: Triggers when replay is canceled
+- **Replay Events Alarm**: Triggers when > 100 replay events per 5 minutes
+
+### Log-Based Alarm Monitoring
+
+When you add a log-based alarm to `default_monitoring.log_alarms`, the module automatically creates:
+
+- **CloudWatch Log Metric Filter**: Extracts metrics from log patterns
+- **Custom Metric Alarm**: Monitors the extracted metric with your specified thresholds
+- **Standardized Alarm Naming**: Follows the same naming convention as other alarms
+
+**Required Configuration**:
+- `log_group_name`: CloudWatch Log Group to monitor
+- `pattern`: Log pattern to match (CloudWatch Logs filter pattern syntax)
+- `transformation_name`: Name for the extracted metric
+- `transformation_namespace`: Namespace for the extracted metric
+- `transformation_value`: Value to extract from matched logs
+- `alarm_description`: Description of the alarm
+- `comparison_operator`: Alarm comparison operator
+- `evaluation_periods`: Number of evaluation periods
+- `period`: Evaluation period in seconds
+- `statistic`: Statistical function to apply
+- `threshold`: Alarm threshold value
+
+**Example Log-Based Alarm**:
+```hcl
+log_alarms = {
+  error-pattern = {
+    log_group_name = "/aws/lambda/api-function"
+    pattern = "[timestamp, level=ERROR, message]"
+    transformation_name = "ErrorCount"
+    transformation_namespace = "CustomMetrics"
+    transformation_value = "1"
+    alarm_description = "Error log pattern detected"
+    comparison_operator = "GreaterThanThreshold"
+    evaluation_periods = 1
+    period = 300
+    statistic = "Sum"
+    threshold = 0
+    severity = "Sev1"
+    sub_service = "Errors"
+    error_details = "error-log-pattern-detected"
+  }
+}
+```
+
 ## Dashboard Linking
 
 The module supports creating overview dashboards that link to specific resource dashboards:
@@ -420,9 +504,12 @@ This module supports monitoring for:
 - **ECS Services**: Fargate and EC2 launch types
 - **EKS Clusters**: Kubernetes clusters with Container Insights
 - **EKS Pods/Apps**: Individual Kubernetes pods and applications
+- **EKS Node Groups**: Kubernetes node groups with comprehensive scaling and health monitoring
 - **Step Functions**: State machines with comprehensive workflow monitoring
 - **EC2 Instances**: Virtual machines with comprehensive system monitoring
 - **S3 Buckets**: Object storage with performance and capacity monitoring
+- **EventBridge**: Event routing and processing with comprehensive rule monitoring
+- **Log-Based Alarms**: CloudWatch Logs with metric filters and transformations
 - **Custom Metrics**: Any CloudWatch metric
 - **Log Groups**: CloudWatch Logs
 - **Event Rules**: CloudWatch Events/EventBridge

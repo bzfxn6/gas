@@ -34,7 +34,6 @@ locals {
 locals {
   default_database_alarms = {
     cpu_utilization = {
-      alarm_name          = "database-cpu-utilization"
       comparison_operator = "GreaterThanThreshold"
       evaluation_periods  = 2
       metric_name         = "CPUUtilization"
@@ -45,9 +44,11 @@ locals {
       alarm_description   = "Database CPU utilization is above 80%"
       treat_missing_data = "notBreaching"
       unit                = "Percent"
+      severity            = "medium"
+      sub_service         = "CPU"
+      error_details       = "cpu-utilization-above-80%"
     }
     memory_utilization = {
-      alarm_name          = "database-memory-utilization"
       comparison_operator = "GreaterThanThreshold"
       evaluation_periods  = 2
       metric_name         = "FreeableMemory"
@@ -58,9 +59,11 @@ locals {
       alarm_description   = "Database freeable memory is below 1GB"
       treat_missing_data = "notBreaching"
       unit                = "Bytes"
+      severity            = "high"
+      sub_service         = "Memory"
+      error_details       = "freeable-memory-below-1gb"
     }
     database_connections = {
-      alarm_name          = "database-connections"
       comparison_operator = "GreaterThanThreshold"
       evaluation_periods  = 2
       metric_name         = "DatabaseConnections"
@@ -71,9 +74,11 @@ locals {
       alarm_description   = "Database has more than 80 connections"
       treat_missing_data = "notBreaching"
       unit                = "Count"
+      severity            = "medium"
+      sub_service         = "Connections"
+      error_details       = "database-connections-above-80"
     }
     read_latency = {
-      alarm_name          = "database-read-latency"
       comparison_operator = "GreaterThanThreshold"
       evaluation_periods  = 2
       metric_name         = "ReadLatency"
@@ -84,9 +89,11 @@ locals {
       alarm_description   = "Database read latency is above 1 second"
       treat_missing_data = "notBreaching"
       unit                = "Seconds"
+      severity            = "medium"
+      sub_service         = "Latency"
+      error_details       = "read-latency-above-1s"
     }
     write_latency = {
-      alarm_name          = "database-write-latency"
       comparison_operator = "GreaterThanThreshold"
       evaluation_periods  = 2
       metric_name         = "WriteLatency"
@@ -97,6 +104,9 @@ locals {
       alarm_description   = "Database write latency is above 1 second"
       treat_missing_data = "notBreaching"
       unit                = "Seconds"
+      severity            = "medium"
+      sub_service         = "Latency"
+      error_details       = "write-latency-above-1s"
     }
   }
 }
@@ -106,7 +116,7 @@ locals {
   database_alarms = merge([
     for db_key, db_config in local.all_databases : {
       for alarm_key, alarm_config in local.default_database_alarms : "${db_key}-${alarm_key}" => merge(alarm_config, {
-        alarm_name = "${db_config.name}-${alarm_config.alarm_name}"
+        alarm_name = "${alarm_config.severity}/${coalesce(db_config.customer, var.customer)}/${coalesce(db_config.team, var.team)}/RDS/${alarm_config.sub_service}/${alarm_config.error_details}"
         dimensions = [
           {
             name  = "DBInstanceIdentifier"
@@ -152,7 +162,6 @@ locals {
 locals {
   default_lambda_alarms = {
     errors = {
-      alarm_name          = "lambda-errors"
       comparison_operator = "GreaterThanThreshold"
       evaluation_periods  = 1
       metric_name         = "Errors"
@@ -163,9 +172,11 @@ locals {
       alarm_description   = "Lambda function has errors"
       treat_missing_data = "notBreaching"
       unit                = "Count"
+      severity            = "high"
+      sub_service         = "Errors"
+      error_details       = "function-errors-occurring"
     }
     duration = {
-      alarm_name          = "lambda-duration"
       comparison_operator = "GreaterThanThreshold"
       evaluation_periods  = 2
       metric_name         = "Duration"
@@ -176,9 +187,11 @@ locals {
       alarm_description   = "Lambda function duration is above 30 seconds"
       treat_missing_data = "notBreaching"
       unit                = "Milliseconds"
+      severity            = "medium"
+      sub_service         = "Duration"
+      error_details       = "execution-duration-above-30s"
     }
     throttles = {
-      alarm_name          = "lambda-throttles"
       comparison_operator = "GreaterThanThreshold"
       evaluation_periods  = 1
       metric_name         = "Throttles"
@@ -189,9 +202,11 @@ locals {
       alarm_description   = "Lambda function is being throttled"
       treat_missing_data = "notBreaching"
       unit                = "Count"
+      severity            = "medium"
+      sub_service         = "Throttles"
+      error_details       = "function-throttled"
     }
     concurrent_executions = {
-      alarm_name          = "lambda-concurrent-executions"
       comparison_operator = "GreaterThanThreshold"
       evaluation_periods  = 2
       metric_name         = "ConcurrentExecutions"
@@ -202,6 +217,9 @@ locals {
       alarm_description   = "Lambda function has more than 100 concurrent executions"
       treat_missing_data = "notBreaching"
       unit                = "Count"
+      severity            = "low"
+      sub_service         = "Concurrency"
+      error_details       = "concurrent-executions-above-1000"
     }
   }
 }
@@ -211,7 +229,7 @@ locals {
   lambda_alarms = merge([
     for lambda_key, lambda_config in local.all_lambdas : {
       for alarm_key, alarm_config in local.default_lambda_alarms : "${lambda_key}-${alarm_key}" => merge(alarm_config, {
-        alarm_name = "${lambda_config.name}-${alarm_config.alarm_name}"
+        alarm_name = "${alarm_config.severity}/${coalesce(lambda_config.customer, var.customer)}/${coalesce(lambda_config.team, var.team)}/Lambda/${alarm_config.sub_service}/${alarm_config.error_details}"
         dimensions = [
           {
             name  = "FunctionName"
