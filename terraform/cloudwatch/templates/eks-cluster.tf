@@ -16,6 +16,9 @@ locals {
       alarm_description   = "EKS cluster CPU utilization is above 80%"
       treat_missing_data = "notBreaching"
       unit                = "Percent"
+      severity            = "medium"
+      sub_service         = "CPU"
+      error_details       = "cpu-utilization-above-80%"
     }
     cluster_memory_utilization = {
       alarm_name          = "eks-cluster-memory-utilization"
@@ -29,6 +32,9 @@ locals {
       alarm_description   = "EKS cluster memory utilization is above 80%"
       treat_missing_data = "notBreaching"
       unit                = "Percent"
+      severity            = "medium"
+      sub_service         = "Memory"
+      error_details       = "memory-utilization-above-80%"
     }
     cluster_disk_utilization = {
       alarm_name          = "eks-cluster-disk-utilization"
@@ -42,6 +48,9 @@ locals {
       alarm_description   = "EKS cluster disk utilization is above 85%"
       treat_missing_data = "notBreaching"
       unit                = "Percent"
+      severity            = "medium"
+      sub_service         = "Disk"
+      error_details       = "disk-utilization-above-85%"
     }
     cluster_pod_count = {
       alarm_name          = "eks-cluster-pod-count"
@@ -55,6 +64,9 @@ locals {
       alarm_description   = "EKS cluster has more than 100 running pods"
       treat_missing_data = "notBreaching"
       unit                = "Count"
+      severity            = "medium"
+      sub_service         = "Pods"
+      error_details       = "pod-count-above-100"
     }
     cluster_node_count = {
       alarm_name          = "eks-cluster-node-count"
@@ -68,6 +80,9 @@ locals {
       alarm_description   = "EKS cluster has fewer than 2 nodes"
       treat_missing_data = "notBreaching"
       unit                = "Count"
+      severity            = "high"
+      sub_service         = "Nodes"
+      error_details       = "node-count-below-2"
     }
     cluster_network_rx = {
       alarm_name          = "eks-cluster-network-rx"
@@ -81,6 +96,9 @@ locals {
       alarm_description   = "EKS cluster network receive is above 5GB"
       treat_missing_data = "notBreaching"
       unit                = "Bytes"
+      severity            = "medium"
+      sub_service         = "Network"
+      error_details       = "network-rx-above-5gb"
     }
     cluster_network_tx = {
       alarm_name          = "eks-cluster-network-tx"
@@ -94,6 +112,9 @@ locals {
       alarm_description   = "EKS cluster network transmit is above 5GB"
       treat_missing_data = "notBreaching"
       unit                = "Bytes"
+      severity            = "medium"
+      sub_service         = "Network"
+      error_details       = "network-tx-above-5gb"
     }
   }
 }
@@ -102,15 +123,25 @@ locals {
 locals {
   eks_cluster_monitoring = merge([
     for eks_key, eks_config in local.all_eks_clusters : {
-      for alarm_key, alarm_config in local.eks_cluster_alarms : "${eks_key}-${alarm_key}" => merge(alarm_config, {
-        alarm_name = "${eks_config.name}-${alarm_config.alarm_name}"
+      for alarm_key, alarm_config in local.eks_cluster_alarms : "${eks_key}-${alarm_key}" => {
+        alarm_name          = "${alarm_config.severity != null ? alarm_config.severity : "Sev2"}/${coalesce(eks_config.customer, var.customer)}/${coalesce(eks_config.team, var.team)}/EKS/Cluster/${alarm_config.sub_service != null ? alarm_config.sub_service : "General"}/${alarm_config.error_details != null ? alarm_config.error_details : "${alarm_key}-threshold-exceeded"}"
+        comparison_operator = alarm_config.comparison_operator
+        evaluation_periods  = alarm_config.evaluation_periods
+        metric_name         = alarm_config.metric_name
+        namespace           = alarm_config.namespace
+        period              = alarm_config.period
+        statistic           = alarm_config.statistic
+        threshold           = alarm_config.threshold
+        alarm_description   = alarm_config.alarm_description
+        treat_missing_data  = alarm_config.treat_missing_data
+        unit                = alarm_config.unit
         dimensions = [
           {
             name  = "ClusterName"
             value = eks_config.name
           }
         ]
-      })
+      }
       # Filter alarms based on user selection
       if length(eks_config.alarms) == 0 || contains(eks_config.alarms, alarm_key)
       # Exclude alarms if specified

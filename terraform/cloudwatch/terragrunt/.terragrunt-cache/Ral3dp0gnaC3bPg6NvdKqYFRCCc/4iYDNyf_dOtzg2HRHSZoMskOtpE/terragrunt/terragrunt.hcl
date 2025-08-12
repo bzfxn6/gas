@@ -2,83 +2,128 @@ terraform {
   source = "../"
 }
 
+# Terragrunt configuration for CloudWatch monitoring
+# This configuration reads monitoring settings from JSON files
+
 locals {
-  local_dashboard_directory  = "${get_terragrunt_dir()}/dashboards"
-  shared_dashboard_directory = "${get_terragrunt_dir()}/../../shared/dashboards"
+  # Environment and region configuration - can be overridden by environment variables
+  environment = get_env("ENVIRONMENT", "production")
+  region     = get_env("AWS_REGION", "us-east-1")
+  project    = get_env("PROJECT", "my-app")
 
-  dashboards = merge(
-    merge([
-      for dashboard_file in fileset(local.local_dashboard_directory, "*.json") :
-      merge([
-        {
-          for dashboard_key, dashboard_config in jsondecode(templatefile("${local.local_dashboard_directory}/${dashboard_file}", {
-            environment = local.environment
-            region      = local.region
-            project     = local.project
-          })) :
-          "${trimsuffix(dashboard_file, ".json")}-${dashboard_key}" => {
-            name           = dashboard_config.name
-            dashboard_body = jsonencode(dashboard_config.dashboard_body)
-          }
-        }
-      ]...)
-    ]...),
-    merge([
-      for dashboard_file in fileset(local.shared_dashboard_directory, "*.json") :
-      merge([
-        {
-          for dashboard_key, dashboard_config in jsondecode(templatefile("${local.shared_dashboard_directory}/${dashboard_file}", {
-            environment = local.environment
-            region      = local.region
-            project     = local.project
-          })) :
-          "shared-${trimsuffix(dashboard_file, ".json")}-${dashboard_key}" => {
-            name           = dashboard_config.name
-            dashboard_body = jsonencode(dashboard_config.dashboard_body)
-          }
-        }
-      ]...)
-    ]...)
-  )
+  # Alarm naming convention variables - can be overridden by environment variables
+  customer = get_env("CUSTOMER", "enbd-preprod")
+  team     = get_env("TEAM", "DNA")
 
-  region      = "us-east-1"
-  environment = "dev"
-  project     = "gas"
+  # Resource naming prefix - used for environment-specific naming
+  resource_prefix = get_env("RESOURCE_PREFIX", "")
+
+  # Dashboard control - set to false for dev environments where you don't want dashboards
+  create_dashboards = get_env("CREATE_DASHBOARDS", "true") == "true"
+
+  # Configuration directories
+  global_conf_directory = "${get_terragrunt_dir()}/configs/global"
+  local_conf_directory  = "${get_terragrunt_dir()}/configs/local"
+
+  # Severity mapping
+  severity_levels = {
+    high   = "Sev1"
+    medium = "Sev2"
+    low    = "Sev3"
+    info   = "Sev4"
+  }
+    
+  # Dashboard configuration - controlled by environment variable
+  dashboards = local.create_dashboards ? {
+    overview = {
+      name = "${local.environment}-infrastructure-overview"
+      dashboard_body = jsonencode({
+        widgets = [
+          {
+            type   = "alarm"
+            x      = 0
+            y      = 0
+            width  = 24
+            height = 6
+            properties = {
+              title = "Infrastructure Alarm Status Overview"
+              alarms = []  # Will be populated dynamically
+            }
+          }
+        ]
+      })
+    }
+  } : {}
 }
 
+# Example: If you have dependencies, you can define them here
+# dependency "eks" {
+#   config_path = "../eks-cluster"
+# }
+
+# Module inputs
 inputs = {
-  dashboards  = local.dashboards
-  region      = local.region
+  region = local.region
   environment = local.environment
-  project     = local.project
-}
-
-# Optional: Configure AWS provider
-# Uncomment and modify if you need specific AWS provider configuration
-# generate "provider" {
-#   path      = "provider.tf"
-#   if_exists = "overwrite_terragrunt"
-#   contents  = <<EOF
-# provider "aws" {
-#   region = "us-east-1"
-#   # Add any other provider configuration here
-# }
-# EOF
-# }
-
-# Optional: Configure backend for state management
-# Uncomment and modify if you want to use remote state
-# remote_state {
-#   backend = "s3"
-#   config = {
-#     bucket         = "your-terraform-state-bucket"
-#     key            = "cloudwatch-dashboards/terraform.tfstate"
-#     region         = "us-east-1"
-#     encrypt        = true
-#     dynamodb_table = "terraform-locks"
-#   }
-#   generate = {
-#     path      = "backend.tf"
-#     if_exists = "overwrite_terragrunt"
-#   }
-# } 
+  project = local.project
+  
+  # Read JSON files dynamically using fileset() and templatefile()
+  default_monitoring = merge(
+    # Base configuration - you can override these with dependencies
+    {
+      databases = {}
+      lambdas = {}
+      sqs_queues = {}
+      ecs_services = {}
+      eks_clusters = {}
+      eks_pods = {}
+      eks_nodegroups = {}
+      step_functions = {}
+      ec2_instances = {}
+      s3_buckets = {}
+      eventbridge_rules = {}
+      log_alarms = {}
+    },
+    # Read global JSON files dynamically
+    { for config_file in fileset(local.global_conf_directory, "*.json") :
+      trimsuffix(config_file, ".json") => jsondecode(templatefile("${local.global_conf_directory}/${config_file}",
+        {
+          ENVIRONMENT     = local.environment
+          CUSTOMER        = local.customer
+          TEAM           = local.team
+          RESOURCE_PREFIX = local.resource_prefix
+          PROJECT        = local.project
+          REGION         = local.region
+        }
+      ))
+    },
+    # Read local JSON files dynamically (takes precedence over global)
+    { for config_file in fileset(local.local_conf_directory, "*.json") :
+      trimsuffix(config_file, ".json") => jsondecode(templatefile("${local.local_conf_directory}/${config_file}",
+        {
+          ENVIRONMENT     = local.environment
+          CUSTOMER        = local.customer
+          TEAM           = local.team
+          RESOURCE_PREFIX = local.resource_prefix
+          PROJECT        = local.project
+          REGION         = local.region
+        }
+      ))
+    }
+  )
+  
+  dashboards = local.dashboards
+  
+  # Pass alarm naming convention variables
+  customer = local.customer
+  team = local.team
+  severity_levels = local.severity_levels
+  
+  common_tags = {
+    Environment = local.environment
+    Project     = local.project
+    ManagedBy   = "terragrunt"
+    Customer    = local.customer
+    Team        = local.team
+  }
+} 

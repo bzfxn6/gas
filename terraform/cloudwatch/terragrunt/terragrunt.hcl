@@ -6,14 +6,25 @@ terraform {
 # This configuration reads monitoring settings from JSON files
 
 locals {
-  environment = "production"
-  region     = "us-east-1"
-  project    = "my-app"
-  
-  # Alarm naming convention variables
-  customer = "enbd-preprod"  # Default customer - can be overridden in JSON
-  team     = "DNA"           # Default team - can be overridden in JSON
-  
+  # Environment and region configuration - can be overridden by environment variables
+  environment = get_env("ENVIRONMENT", "production")
+  region     = get_env("AWS_REGION", "us-east-1")
+  project    = get_env("PROJECT", "my-app")
+
+  # Alarm naming convention variables - can be overridden by environment variables
+  customer = get_env("CUSTOMER", "enbd-preprod")
+  team     = get_env("TEAM", "DNA")
+
+  # Resource naming prefix - used for environment-specific naming
+  resource_prefix = get_env("RESOURCE_PREFIX", "")
+
+  # Dashboard control - set to false for dev environments where you don't want dashboards
+  create_dashboards = get_env("CREATE_DASHBOARDS", "true") == "true"
+
+  # Configuration directories
+  global_conf_directory = "${get_terragrunt_dir()}/configs/global"
+  local_conf_directory  = "${get_terragrunt_dir()}/configs/local"
+
   # Severity mapping
   severity_levels = {
     high   = "Sev1"
@@ -21,138 +32,11 @@ locals {
     low    = "Sev3"
     info   = "Sev4"
   }
-  
-  # Read monitoring configurations from JSON files
-  databases_config = jsondecode(file("${get_terragrunt_dir()}/configs/databases.json"))
-  lambdas_config = jsondecode(file("${get_terragrunt_dir()}/configs/lambdas.json"))
-  sqs_queues_config = jsondecode(file("${get_terragrunt_dir()}/configs/sqs-queues.json"))
-  ecs_services_config = jsondecode(file("${get_terragrunt_dir()}/configs/ecs-services.json"))
-  eks_clusters_config = jsondecode(file("${get_terragrunt_dir()}/configs/eks-clusters.json"))
-  eks_pods_config = jsondecode(file("${get_terragrunt_dir()}/configs/eks-pods.json"))
-  eks_nodegroups_config = jsondecode(file("${get_terragrunt_dir()}/configs/eks-nodegroups.json"))
-  step_functions_config = jsondecode(file("${get_terragrunt_dir()}/configs/step-functions.json"))
-  ec2_instances_config = jsondecode(file("${get_terragrunt_dir()}/configs/ec2-instances.json"))
-  s3_buckets_config = jsondecode(file("${get_terragrunt_dir()}/configs/s3-buckets.json"))
-  eventbridge_rules_config = jsondecode(file("${get_terragrunt_dir()}/configs/eventbridge-rules.json"))
-  log_alarms_config = jsondecode(file("${get_terragrunt_dir()}/configs/log-alarms.json"))
-  
-  # Merge configurations with environment variables and default values
-  default_monitoring = {
-    databases = merge(
-      local.databases_config,
-      { for k, v in local.databases_config : k => merge(v, { 
-        name = "${v.name}-${local.environment}",
-        customer = coalesce(v.customer, local.customer),
-        team = coalesce(v.team, local.team)
-      }) }
-    )
     
-    lambdas = merge(
-      local.lambdas_config,
-      { for k, v in local.lambdas_config : k => merge(v, { 
-        name = "${v.name}-${local.environment}",
-        customer = coalesce(v.customer, local.customer),
-        team = coalesce(v.team, local.team)
-      }) }
-    )
-    
-    sqs_queues = merge(
-      local.sqs_queues_config,
-      { for k, v in local.sqs_queues_config : k => merge(v, { 
-        name = "${v.name}-${local.environment}",
-        customer = coalesce(v.customer, local.customer),
-        team = coalesce(v.team, local.team)
-      }) }
-    )
-    
-    ecs_services = merge(
-      local.ecs_services_config,
-      { for k, v in local.ecs_services_config : k => merge(v, { 
-        name = "${v.name}-${local.environment}",
-        cluster_name = "${v.cluster_name}-${local.environment}",
-        customer = coalesce(v.customer, local.customer),
-        team = coalesce(v.team, local.team)
-      }) }
-    )
-    
-    eks_clusters = merge(
-      local.eks_clusters_config,
-      { for k, v in local.eks_clusters_config : k => merge(v, { 
-        name = "${v.name}-${local.environment}",
-        customer = coalesce(v.customer, local.customer),
-        team = coalesce(v.team, local.team)
-      }) }
-    )
-    
-    eks_pods = merge(
-      local.eks_pods_config,
-      { for k, v in local.eks_pods_config : k => merge(v, { 
-        name = "${v.name}-${local.environment}",
-        cluster_name = "${v.cluster_name}-${local.environment}",
-        customer = coalesce(v.customer, local.customer),
-        team = coalesce(v.team, local.team)
-      }) }
-    )
-    
-    eks_nodegroups = merge(
-      local.eks_nodegroups_config,
-      { for k, v in local.eks_nodegroups_config : k => merge(v, { 
-        name = "${v.name}-${local.environment}",
-        cluster_name = "${v.cluster_name}-${local.environment}",
-        customer = coalesce(v.customer, local.customer),
-        team = coalesce(v.team, local.team)
-      }) }
-    )
-    
-    step_functions = merge(
-      local.step_functions_config,
-      { for k, v in local.step_functions_config : k => merge(v, { 
-        name = "${v.name}-${local.environment}",
-        customer = coalesce(v.customer, local.customer),
-        team = coalesce(v.team, local.team)
-      }) }
-    )
-    
-    ec2_instances = merge(
-      local.ec2_instances_config,
-      { for k, v in local.ec2_instances_config : k => merge(v, { 
-        name = "${v.name}-${local.environment}",
-        customer = coalesce(v.customer, local.customer),
-        team = coalesce(v.team, local.team)
-      }) }
-    )
-    
-    s3_buckets = merge(
-      local.s3_buckets_config,
-      { for k, v in local.s3_buckets_config : k => merge(v, { 
-        name = "${v.name}-${local.environment}",
-        customer = coalesce(v.customer, local.customer),
-        team = coalesce(v.team, local.team)
-      }) }
-    )
-    
-    eventbridge_rules = merge(
-      local.eventbridge_rules_config,
-      { for k, v in local.eventbridge_rules_config : k => merge(v, { 
-        name = "${v.name}-${local.environment}",
-        customer = coalesce(v.customer, local.customer),
-        team = coalesce(v.team, local.team)
-      }) }
-    )
-    
-    log_alarms = merge(
-      local.log_alarms_config,
-      { for k, v in local.log_alarms_config : k => merge(v, { 
-        customer = coalesce(v.customer, local.customer),
-        team = coalesce(v.team, local.team)
-      }) }
-    )
-  }
-  
-  # Dashboard configuration
-  dashboards = {
+  # Dashboard configuration - controlled by environment variable
+  dashboards = local.create_dashboards ? {
     overview = {
-      dashboard_name = "${local.environment}-infrastructure-overview"
+      name = "${local.environment}-infrastructure-overview"
       dashboard_body = jsonencode({
         widgets = [
           {
@@ -169,18 +53,65 @@ locals {
         ]
       })
     }
-  }
+  } : {}
 }
 
-# Call the CloudWatch module
-module "cloudwatch" {
-  source = "../../terraform/cloudwatch"
-  
+# Example: If you have dependencies, you can define them here
+# dependency "eks" {
+#   config_path = "../eks-cluster"
+# }
+
+# Module inputs
+inputs = {
   region = local.region
   environment = local.environment
   project = local.project
   
-  default_monitoring = local.default_monitoring
+  # Read JSON files dynamically using fileset() and templatefile()
+  default_monitoring = merge(
+    # Base configuration - you can override these with dependencies
+    {
+      databases = {}
+      lambdas = {}
+      sqs_queues = {}
+      ecs_services = {}
+      eks_clusters = {}
+      eks_pods = {}
+      eks_nodegroups = {}
+      step_functions = {}
+      ec2_instances = {}
+      s3_buckets = {}
+      eventbridge_rules = {}
+      log_alarms = {}
+    },
+    # Read global JSON files dynamically
+    { for config_file in fileset(local.global_conf_directory, "*.json") :
+      trimsuffix(config_file, ".json") => jsondecode(templatefile("${local.global_conf_directory}/${config_file}",
+        {
+          ENVIRONMENT     = local.environment
+          CUSTOMER        = local.customer
+          TEAM           = local.team
+          RESOURCE_PREFIX = local.resource_prefix
+          PROJECT        = local.project
+          REGION         = local.region
+        }
+      ))
+    },
+    # Read local JSON files dynamically (takes precedence over global)
+    { for config_file in fileset(local.local_conf_directory, "*.json") :
+      trimsuffix(config_file, ".json") => jsondecode(templatefile("${local.local_conf_directory}/${config_file}",
+        {
+          ENVIRONMENT     = local.environment
+          CUSTOMER        = local.customer
+          TEAM           = local.team
+          RESOURCE_PREFIX = local.resource_prefix
+          PROJECT        = local.project
+          REGION         = local.region
+        }
+      ))
+    }
+  )
+  
   dashboards = local.dashboards
   
   # Pass alarm naming convention variables
