@@ -1,12 +1,14 @@
 {
-  "main-cluster": {
-    "name": "main-eks-cluster-${ENVIRONMENT}",
-    "customer": "${CUSTOMER}",
-    "team": "${TEAM}",
+  "dev-cluster": {
+    "name": "dev-eks-cluster",
+    "short_name": "dev",
+    "customer": "dev-account",
+    "team": "dev-team",
     "alarms": ["cpu_utilization", "memory_utilization"],
+    "exclude_alarms": ["network_rx", "network_tx"],
     "custom_alarms": {
       "high_pod_count": {
-        "alarm_name": "Sev2/${CUSTOMER}/${TEAM}/EKS/Cluster/PodCount/pod-count-above-100",
+        "alarm_name": "Sev2/dev-account/dev-team/EKS/dev/Cluster/PodCount/pod-count-above-100",
         "comparison_operator": "GreaterThanThreshold",
         "evaluation_periods": 2,
         "metric_name": "number_of_pods",
@@ -20,22 +22,29 @@
         "dimensions": [
           {
             "name": "ClusterName",
-            "value": "main-eks-cluster-${ENVIRONMENT}"
+            "value": "dev-eks-cluster"
           }
         ]
       }
     }
   },
-  "secondary-cluster": {
-    "name": "secondary-eks-cluster-${ENVIRONMENT}",
-    "customer": "${CUSTOMER}",
-    "team": "${TEAM}",
-    "alarms": ["cpu_utilization", "memory_utilization"]
+  "prod-cluster": {
+    "name": "prod-eks-cluster",
+    "short_name": "prod",
+    "customer": "prod-account",
+    "team": "prod-team"
   },
   "staging-cluster": {
-    "name": "staging-eks-cluster-${ENVIRONMENT}",
-    "customer": "${CUSTOMER}",
-    "team": "${TEAM}",
-    "alarms": ["cpu_utilization"]
+    "name": "staging-eks-cluster",
+    "short_name": "stg",
+    "customer": "staging-account",
+    "team": "staging-team",
+    "alarms": ["cpu_utilization", "memory_utilization", "disk_utilization", "pod_count"],
+    "exclude_alarms": ["network_rx", "network_tx", "node_count"]
+  },
+  "legacy-cluster": {
+    "name": "legacy-eks-cluster",
+    "customer": "legacy-account",
+    "team": "legacy-team"
   }
 }

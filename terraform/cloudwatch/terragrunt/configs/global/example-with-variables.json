@@ -1,0 +1,29 @@
+{
+  "example-database": {
+    "name": "${RESOURCE_PREFIX}example-database",
+    "customer": "${CUSTOMER}",
+    "team": "${TEAM}",
+    "environment": "${ENVIRONMENT}",
+    "region": "${REGION}",
+    "project": "${PROJECT}",
+    "alarm_actions": ["${DEFAULT_ALARM_ACTIONS}"],
+    "ok_actions": ["${DEFAULT_OK_ACTIONS}"],
+    "insufficient_data_actions": ["${DEFAULT_INSUFFICIENT_DATA_ACTIONS}"],
+    "custom_threshold": 85,
+    "custom_description": "Example database for ${ENVIRONMENT} environment in ${REGION}"
+  },
+  "example-lambda": {
+    "name": "${RESOURCE_PREFIX}example-function",
+    "customer": "${CUSTOMER}",
+    "team": "${TEAM}",
+    "environment": "${ENVIRONMENT}",
+    "region": "${REGION}",
+    "project": "${PROJECT}",
+    "alarm_actions": ["${DEFAULT_ALARM_ACTIONS}"],
+    "ok_actions": ["${DEFAULT_OK_ACTIONS}"],
+    "insufficient_data_actions": ["${DEFAULT_INSUFFICIENT_DATA_ACTIONS}"],
+    "custom_timeout": 30,
+    "custom_memory": 512,
+    "custom_description": "Example Lambda function for ${PROJECT} project"
+  }
+}

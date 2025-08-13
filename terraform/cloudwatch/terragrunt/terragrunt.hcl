@@ -20,10 +20,18 @@ locals {
 
   # Dashboard control - set to false for dev environments where you don't want dashboards
   create_dashboards = get_env("CREATE_DASHBOARDS", "true") == "true"
-
-  # Configuration directories
-  global_conf_directory = "${get_terragrunt_dir()}/configs/global"
-  local_conf_directory  = "${get_terragrunt_dir()}/configs/local"
+  
+  # Configuration control - enable/disable specific service monitoring
+  enable_database_monitoring = get_env("ENABLE_DATABASE_MONITORING", "true") == "true"
+  enable_lambda_monitoring = get_env("ENABLE_LAMBDA_MONITORING", "true") == "true"
+  enable_eks_monitoring = get_env("ENABLE_EKS_MONITORING", "true") == "true"
+  enable_ecs_monitoring = get_env("ENABLE_ECS_MONITORING", "true") == "true"
+  enable_ec2_monitoring = get_env("ENABLE_EC2_MONITORING", "true") == "true"
+  enable_s3_monitoring = get_env("ENABLE_S3_MONITORING", "true") == "true"
+  enable_sqs_monitoring = get_env("ENABLE_SQS_MONITORING", "true") == "true"
+  enable_step_functions_monitoring = get_env("ENABLE_STEP_FUNCTIONS_MONITORING", "true") == "true"
+  enable_eventbridge_monitoring = get_env("ENABLE_EVENTBRIDGE_MONITORING", "true") == "true"
+  enable_log_monitoring = get_env("ENABLE_LOG_MONITORING", "true") == "true"
 
   # Severity mapping
   severity_levels = {
@@ -67,48 +75,46 @@ inputs = {
   environment = local.environment
   project = local.project
   
-  # Read JSON files dynamically using fileset() and templatefile()
+  # Clean, simple for loop pattern like your security group example
   default_monitoring = merge(
-    # Base configuration - you can override these with dependencies
-    {
-      databases = {}
-      lambdas = {}
-      sqs_queues = {}
-      ecs_services = {}
-      eks_clusters = {}
-      eks_pods = {}
-      eks_nodegroups = {}
-      step_functions = {}
-      ec2_instances = {}
-      s3_buckets = {}
-      eventbridge_rules = {}
-      log_alarms = {}
+    { for config_file in fileset("${get_terragrunt_dir()}/configs/global", "*.json") :
+      trimsuffix(config_file, ".json") => jsondecode(templatefile("${get_terragrunt_dir()}/configs/global/${config_file}", {
+        CUSTOMER     = local.customer
+        TEAM         = local.team
+        ENVIRONMENT  = local.environment
+        REGION       = local.region
+        PROJECT      = local.project
+        RESOURCE_PREFIX = local.resource_prefix
+        DEFAULT_ALARM_ACTIONS = join(",", try(split(",", get_env("DEFAULT_ALARM_ACTIONS", "")), []))
+        DEFAULT_OK_ACTIONS = join(",", try(split(",", get_env("DEFAULT_OK_ACTIONS", "")), []))
+        DEFAULT_INSUFFICIENT_DATA_ACTIONS = join(",", try(split(",", get_env("DEFAULT_INSUFFICIENT_DATA_ACTIONS", "")), []))
+      }))
     },
-    # Read global JSON files dynamically
-    { for config_file in fileset(local.global_conf_directory, "*.json") :
-      trimsuffix(config_file, ".json") => jsondecode(templatefile("${local.global_conf_directory}/${config_file}",
-        {
-          ENVIRONMENT     = local.environment
-          CUSTOMER        = local.customer
-          TEAM           = local.team
-          RESOURCE_PREFIX = local.resource_prefix
-          PROJECT        = local.project
-          REGION         = local.region
-        }
-      ))
+    { for config_file in fileset("${get_terragrunt_dir()}/configs/local", "*.json") :
+      trimsuffix(config_file, ".json") => jsondecode(templatefile("${get_terragrunt_dir()}/configs/local/${config_file}", {
+        CUSTOMER     = local.customer
+        TEAM         = local.team
+        ENVIRONMENT  = local.environment
+        REGION       = local.region
+        PROJECT      = local.project
+        RESOURCE_PREFIX = local.resource_prefix
+        DEFAULT_ALARM_ACTIONS = join(",", try(split(",", get_env("DEFAULT_ALARM_ACTIONS", "")), []))
+        DEFAULT_OK_ACTIONS = join(",", try(split(",", get_env("DEFAULT_OK_ACTIONS", "")), []))
+        DEFAULT_INSUFFICIENT_DATA_ACTIONS = join(",", try(split(",", get_env("DEFAULT_INSUFFICIENT_DATA_ACTIONS", "")), []))
+      }))
     },
-    # Read local JSON files dynamically (takes precedence over global)
-    { for config_file in fileset(local.local_conf_directory, "*.json") :
-      trimsuffix(config_file, ".json") => jsondecode(templatefile("${local.local_conf_directory}/${config_file}",
-        {
-          ENVIRONMENT     = local.environment
-          CUSTOMER        = local.customer
-          TEAM           = local.team
-          RESOURCE_PREFIX = local.resource_prefix
-          PROJECT        = local.project
-          REGION         = local.region
-        }
-      ))
+    { for config_file in fileset("${get_terragrunt_dir()}/configs/${local.environment}", "*.json") :
+      trimsuffix(config_file, ".json") => jsondecode(templatefile("${get_terragrunt_dir()}/configs/${local.environment}/${config_file}", {
+        CUSTOMER     = local.customer
+        TEAM         = local.team
+        ENVIRONMENT  = local.environment
+        REGION       = local.region
+        PROJECT      = local.project
+        RESOURCE_PREFIX = local.resource_prefix
+        DEFAULT_ALARM_ACTIONS = join(",", try(split(",", get_env("DEFAULT_ALARM_ACTIONS", "")), []))
+        DEFAULT_OK_ACTIONS = join(",", try(split(",", get_env("DEFAULT_OK_ACTIONS", "")), []))
+        DEFAULT_INSUFFICIENT_DATA_ACTIONS = join(",", try(split(",", get_env("DEFAULT_INSUFFICIENT_DATA_ACTIONS", "")), []))
+      }))
     }
   )
   
@@ -118,6 +124,11 @@ inputs = {
   customer = local.customer
   team = local.team
   severity_levels = local.severity_levels
+  
+  # Default alarm actions - you can override these with environment variables
+  default_alarm_actions = try(split(",", get_env("DEFAULT_ALARM_ACTIONS", "")), [])
+  default_ok_actions = try(split(",", get_env("DEFAULT_OK_ACTIONS", "")), [])
+  default_insufficient_data_actions = try(split(",", get_env("DEFAULT_INSUFFICIENT_DATA_ACTIONS", "")), [])
   
   common_tags = {
     Environment = local.environment

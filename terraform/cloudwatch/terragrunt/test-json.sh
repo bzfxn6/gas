@@ -46,3 +46,5 @@ echo "1. Run: ./console-debug.sh"
 echo "2. In console, type: local.eks_clusters_config"
 echo "3. Check if the output matches your JSON file"
 
+
+

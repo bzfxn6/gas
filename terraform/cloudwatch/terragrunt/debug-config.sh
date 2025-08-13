@@ -75,3 +75,5 @@ echo ""
 echo "To run full plan: terragrunt plan"
 echo "To apply: terragrunt apply"
 
+
+

@@ -5,12 +5,14 @@ This Terraform module provides a comprehensive solution for CloudWatch monitorin
 ## Features
 
 - **Automatic Default Monitoring**: Pre-configured alarms and metrics for databases, Lambda functions, SQS queues, and ECS services
+- **Default Alarm Actions**: Configure default actions (SNS topics, Lambda functions, etc.) for all alarms
 - **Custom Monitoring**: Full support for custom alarms, metrics, and dashboards
 - **Dashboard Linking**: Create overview dashboards that link to specific resource dashboards
 - **Comprehensive Resource Support**: CloudWatch dashboards, alarms, log groups, event rules, and targets
 - **Flexible Configuration**: Use simple maps to configure complex monitoring setups
 - **Tagging Support**: Comprehensive tagging for all resources
 - **Terragrunt Compatible**: Designed to work seamlessly with Terragrunt
+
 
 ## Quick Start
 
@@ -43,10 +45,110 @@ module "cloudwatch" {
 }
 ```
 
+### Advanced Usage with Dynamic JSON File Reading
+
+The module supports a clean, elegant for loop pattern for reading JSON configuration files with templatefile variable interpolation:
+
+```hcl
+# In your terragrunt.hcl
+locals {
+  # Template variables for interpolation
+  template_vars = {
+    CUSTOMER     = local.customer
+    TEAM         = local.team
+    ENVIRONMENT  = local.environment
+    REGION       = local.region
+    PROJECT      = local.project
+    RESOURCE_PREFIX = local.resource_prefix
+    DEFAULT_ALARM_ACTIONS = join(",", try(split(",", get_env("DEFAULT_ALARM_ACTIONS", "")), []))
+    DEFAULT_OK_ACTIONS = join(",", try(split(",", get_env("DEFAULT_OK_ACTIONS", "")), []))
+    DEFAULT_INSUFFICIENT_DATA_ACTIONS = join(",", try(split(",", get_env("DEFAULT_INSUFFICIENT_DATA_ACTIONS", "")), []))
+  }
+}
+
+inputs = {
+  # Clean, simple for loop pattern
+  default_monitoring = merge(
+    { for config_file in fileset("${get_terragrunt_dir()}/configs/global", "*.json") :
+      trimsuffix(config_file, ".json") => jsondecode(templatefile("${get_terragrunt_dir()}/configs/global/${config_file}", local.template_vars))
+    },
+    { for config_file in fileset("${get_terragrunt_dir()}/configs/local", "*.json") :
+      trimsuffix(config_file, ".json") => jsondecode(templatefile("${get_terragrunt_dir()}/configs/local/${config_file}", local.template_vars))
+    },
+    { for config_file in fileset("${get_terragrunt_dir()}/configs/${local.environment}", "*.json") :
+      trimsuffix(config_file, ".json") => jsondecode(templatefile("${get_terragrunt_dir()}/configs/${local.environment}/${config_file}", local.template_vars))
+    }
+  )
+}
+```
+
+**Benefits of this approach:**
+- ✅ **Automatic file discovery**: No need to manually list each JSON file
+- ✅ **Templatefile support**: Variables like `${CUSTOMER}`, `${TEAM}` are interpolated
+- ✅ **Graceful handling**: Missing files don't cause errors
+- ✅ **Environment overrides**: Local and environment-specific files override global
+- ✅ **Clean and simple**: Elegant pattern like your security group examples
+
 This simple configuration will automatically create:
 - 5 default alarms for each database (CPU, memory, connections, read/write latency)
 - 3 default alarms for each Lambda (errors, duration, throttles)
 - 3 default alarms for each SQS queue (message age, queue depth, failed messages)
+
+### Default Alarm Actions
+
+Configure default actions for all alarms (SNS topics, Lambda functions, etc.):
+
+```hcl
+module "cloudwatch" {
+  source = "./terraform/cloudwatch"
+  
+  region      = "us-east-1"
+  environment = "prod"
+  project     = "gas"
+  
+  # Default alarm actions - applied to all alarms unless overridden
+  default_alarm_actions = [
+    "arn:aws:sns:us-east-1:123456789012:alerts-topic",
+    "arn:aws:sns:us-east-1:123456789012:pagerduty-topic"
+  ]
+  
+  default_ok_actions = [
+    "arn:aws:sns:us-east-1:123456789012:resolved-topic"
+  ]
+  
+  default_insufficient_data_actions = [
+    "arn:aws:sns:us-east-1:123456789012:insufficient-data-topic"
+  ]
+  
+  # Your monitoring configuration...
+  default_monitoring = {
+    databases = {
+      app-db = { name = "app-production-db" }
+    }
+  }
+}
+```
+
+**Individual alarms can override default actions:**
+```hcl
+default_monitoring = {
+  databases = {
+    critical-db = {
+      name = "critical-database"
+      custom_alarms = {
+        high-cpu = {
+          alarm_name = "critical-db-high-cpu"
+          # ... other alarm configuration
+          alarm_actions = [
+            "arn:aws:sns:us-east-1:123456789012:critical-alerts-topic",
+            "arn:aws:sns:us-east-1:123456789012:emergency-topic"
+          ]  # Overrides default actions for this specific alarm
+        }
+      }
+    }
+  }
+}
+```
 
 ### Advanced Usage with Custom Monitoring
 
@@ -148,6 +250,14 @@ module "cloudwatch" {
 | default_monitoring.lambdas | Map of Lambda functions to monitor with default alarms | `map(object)` | `{}` | no |
 | default_monitoring.sqs_queues | Map of SQS queues to monitor with default alarms | `map(object)` | `{}` | no |
 | default_monitoring.ecs_services | Map of ECS services to monitor with default alarms | `map(object)` | `{}` | no |
+
+### Default Alarm Actions
+
+| Name | Description | Type | Default | Required |
+|------|-------------|------|---------|:--------:|
+| default_alarm_actions | Default actions to take when alarms are triggered (e.g., SNS topic ARNs) | `list(string)` | `[]` | no |
+| default_ok_actions | Default actions to take when alarms return to OK state | `list(string)` | `[]` | no |
+| default_insufficient_data_actions | Default actions to take when alarms have insufficient data | `list(string)` | `[]` | no |
 
 ### Custom Resources
 

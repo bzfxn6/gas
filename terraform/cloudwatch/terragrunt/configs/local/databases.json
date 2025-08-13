@@ -1,51 +1,41 @@
 {
   "main-database": {
-    "name": "${RESOURCE_PREFIX}main-database",
-    "region": "${REGION}",
+    "name": "local-main-database-${ENVIRONMENT}",
     "customer": "${CUSTOMER}",
     "team": "${TEAM}",
     "environment": "${ENVIRONMENT}",
+    "region": "${REGION}",
     "project": "${PROJECT}",
     "alarms": ["cpu_utilization", "memory_utilization", "database_connections"],
     "exclude_alarms": ["read_latency", "write_latency"],
     "custom_alarms": {
-      "strict-cpu-utilization": {
-        "alarm_name": "Sev2/${CUSTOMER}/${TEAM}/RDS/CPU/strict-cpu-utilization-above-70pct",
+      "local-strict-cpu-utilization": {
+        "alarm_name": "Sev1/${CUSTOMER}/${TEAM}/RDS/Local/CPU/local-strict-cpu-utilization-above-60pct",
         "comparison_operator": "GreaterThanThreshold",
         "evaluation_periods": 1,
         "metric_name": "CPUUtilization",
         "namespace": "AWS/RDS",
         "period": 300,
         "statistic": "Average",
-        "threshold": 70,
-        "alarm_description": "Main database CPU utilization is above 70% for ${ENVIRONMENT} environment",
+        "threshold": 60,
+        "alarm_description": "Local main database CPU utilization is above 60% (stricter than global)",
         "dimensions": [
           {
             "name": "DBInstanceIdentifier",
-            "value": "${RESOURCE_PREFIX}main-database"
+            "value": "local-main-database-${ENVIRONMENT}"
           }
         ]
       }
     }
   },
-  "read-replica": {
-    "name": "${RESOURCE_PREFIX}read-replica",
-    "region": "${REGION}",
+  "local-analytics-db": {
+    "name": "local-analytics-database-${ENVIRONMENT}",
     "customer": "${CUSTOMER}",
     "team": "${TEAM}",
     "environment": "${ENVIRONMENT}",
-    "project": "${PROJECT}",
-    "alarms": ["database_connections", "read_latency"],
-    "custom_alarms": {}
-  },
-  "analytics-db": {
-    "name": "${RESOURCE_PREFIX}analytics-database",
     "region": "${REGION}",
-    "customer": "${CUSTOMER}",
-    "team": "${TEAM}",
-    "environment": "${ENVIRONMENT}",
     "project": "${PROJECT}",
-    "exclude_alarms": ["write_latency"],
+    "alarms": ["cpu_utilization", "free_storage_space"],
     "custom_alarms": {}
   }
 }

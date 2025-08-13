@@ -36,3 +36,5 @@ echo "local.default_monitoring.eks_clusters"
 echo "local.all_alarms"
 echo "module.cloudwatch.default_monitoring"
 
+
+

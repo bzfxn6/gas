@@ -59,3 +59,5 @@ echo "1. Review the plan: terragrunt show test-plan.tfplan"
 echo "2. Apply the configuration: terragrunt apply"
 echo "3. Check created resources in AWS Console"
 
+
+

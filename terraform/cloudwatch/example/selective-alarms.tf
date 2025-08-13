@@ -8,6 +8,16 @@ module "cloudwatch" {
   environment = "production"
   project = "my-app"
   
+  # Default alarm actions - applied to all alarms unless overridden
+  default_alarm_actions = [
+    "arn:aws:sns:us-east-1:123456789012:production-alerts-topic",
+    "arn:aws:sns:us-east-1:123456789012:pagerduty-topic"
+  ]
+  
+  default_ok_actions = [
+    "arn:aws:sns:us-east-1:123456789012:production-resolved-topic"
+  ]
+  
   default_monitoring = {
     # Single database with selective alarms
     database = {

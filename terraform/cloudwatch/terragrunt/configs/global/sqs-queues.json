@@ -2,6 +2,8 @@
   "events-queue": {
     "name": "events-queue",
     "region": "us-east-1",
+    "customer": "enbd-preprod",
+    "team": "DNA",
     "alarms": ["queue_depth", "message_age"],
     "custom_alarms": {
       "high-queue-depth": {
@@ -26,12 +28,16 @@
   "notifications-queue": {
     "name": "notifications-queue",
     "region": "us-east-1",
+    "customer": "enbd-preprod",
+    "team": "DNA",
     "alarms": ["queue_depth", "message_age", "error_rate"],
     "custom_alarms": {}
   },
   "dead-letter-queue": {
     "name": "dead-letter-queue",
     "region": "us-east-1",
+    "customer": "enbd-preprod",
+    "team": "DNA",
     "alarms": ["queue_depth"],
     "custom_alarms": {}
   }

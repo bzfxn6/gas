@@ -109,3 +109,5 @@ echo ""
 echo "📝 Note: This is a basic syntax check."
 echo "   For full validation, run 'terraform validate' when tools are available."
 
+
+

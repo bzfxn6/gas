@@ -1,29 +1,21 @@
 {
-  "dev-cluster": {
-    "name": "dev-eks-cluster-${ENVIRONMENT}",
-    "customer": "dev-account",
-    "team": "dev-team",
-    "alarms": ["cpu_utilization", "memory_utilization"],
-    "custom_alarms": {
-      "high_pod_count": {
-        "alarm_name": "Sev2/dev-account/dev-team/EKS/Cluster/PodCount/pod-count-above-100",
-        "comparison_operator": "GreaterThanThreshold",
-        "evaluation_periods": 2,
-        "metric_name": "number_of_pods",
-        "namespace": "ContainerInsights",
-        "period": 300,
-        "statistic": "Average",
-        "threshold": 100,
-        "alarm_description": "EKS cluster pod count is above 100",
-        "treat_missing_data": "notBreaching",
-        "unit": "Count",
-        "dimensions": [
-          {
-            "name": "ClusterName",
-            "value": "dev-eks-cluster-${ENVIRONMENT}"
-          }
-        ]
-      }
-    }
+  "test-cluster": {
+    "name": "test-eks-cluster",
+    "short_name": "test",
+    "customer": "test-account",
+    "team": "test-team",
+    "alarms": ["cpu_utilization", "memory_utilization", "disk_utilization"]
+  },
+  "prod-cluster": {
+    "name": "prod-eks-cluster",
+    "short_name": "prod",
+    "customer": "prod-account",
+    "team": "prod-team"
+  },
+  "legacy-cluster": {
+    "name": "legacy-eks-cluster",
+    "customer": "legacy-account",
+    "team": "legacy-team"
   }
 }
+

@@ -8,6 +8,15 @@ module "cloudwatch_simple" {
   environment = "dev"
   project     = "gas"
   
+  # Default alarm actions - applied to all alarms unless overridden
+  default_alarm_actions = [
+    "arn:aws:sns:us-east-1:123456789012:dev-alerts-topic"
+  ]
+  
+  default_ok_actions = [
+    "arn:aws:sns:us-east-1:123456789012:dev-resolved-topic"
+  ]
+  
   # Just add database names and get default monitoring
   default_monitoring = {
     # Database monitoring - just add names and get default monitoring

@@ -27,6 +27,24 @@ variable "common_tags" {
   }
 }
 
+variable "tags" {
+  description = "Additional tags to apply to all resources"
+  type        = map(string)
+  default     = {}
+}
+
+variable "create_dashboard" {
+  description = "Whether to create a CloudWatch dashboard"
+  type        = bool
+  default     = false
+}
+
+variable "dashboard_name" {
+  description = "Name of the CloudWatch dashboard"
+  type        = string
+  default     = "cloudwatch-dashboard"
+}
+
 # Alarm naming convention variables
 variable "customer" {
   description = "Customer name for alarm naming convention"
@@ -182,3 +200,21 @@ variable "dashboard_links" {
 
 
  
+# Default alarm actions
+variable "default_alarm_actions" {
+  description = "Default actions to take when alarms are triggered (e.g., SNS topic ARNs)"
+  type = list(string)
+  default = []
+}
+
+variable "default_ok_actions" {
+  description = "Default actions to take when alarms return to OK state"
+  type = list(string)
+  default = []
+}
+
+variable "default_insufficient_data_actions" {
+  description = "Default actions to take when alarms have insufficient data"
+  type = list(string)
+  default = []
+}

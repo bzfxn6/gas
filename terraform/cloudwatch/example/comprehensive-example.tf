@@ -153,6 +153,7 @@ module "cloudwatch_comprehensive" {
     eks_clusters = {
       production-cluster = {
         name = "production-eks-cluster"
+        short_name = "prod"  # Will appear in alarm names as "EKS/prod/Cluster/..."
         region = "us-east-1"
         # Custom alarms for this specific EKS cluster
         custom_alarms = {
@@ -177,6 +178,12 @@ module "cloudwatch_comprehensive" {
       }
       staging-cluster = {
         name = "staging-eks-cluster"
+        short_name = "stg"   # Will appear in alarm names as "EKS/stg/Cluster/..."
+        region = "us-east-1"
+      }
+      legacy-cluster = {
+        name = "legacy-eks-cluster"
+        # No short_name - will appear in alarm names as "EKS/Cluster/..."
         region = "us-east-1"
       }
     }

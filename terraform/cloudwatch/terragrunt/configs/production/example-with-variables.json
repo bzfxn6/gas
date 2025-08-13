@@ -1,0 +1,15 @@
+{
+  "example-database": {
+    "name": "prod-example-database",
+    "customer": "prod-customer",
+    "team": "prod-team",
+    "environment": "production",
+    "region": "us-west-2",
+    "project": "prod-project",
+    "alarm_actions": ["arn:aws:sns:us-west-2:123456789012:prod-alerts"],
+    "ok_actions": ["arn:aws:sns:us-west-2:123456789012:prod-resolved"],
+    "insufficient_data_actions": ["arn:aws:sns:us-west-2:123456789012:prod-insufficient-data"],
+    "custom_threshold": 90,
+    "custom_description": "Production database with higher thresholds"
+  }
+}

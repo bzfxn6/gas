@@ -1,31 +1,65 @@
 # CloudWatch Configuration Files
 
-This directory contains JSON configuration files for CloudWatch monitoring resources. The configuration system is now clean and simple, allowing you to use dependencies properly.
+This directory contains JSON configuration files for CloudWatch monitoring resources. The configuration system uses a clean, elegant for loop pattern with automatic file discovery and templatefile variable interpolation.
 
-## Simple Approach
+## Clean For Loop Pattern with Automatic File Discovery
 
-The current `terragrunt.hcl` uses a clean, simple approach:
+The current `terragrunt.hcl` uses a clean, elegant for loop pattern that automatically discovers JSON files:
 
 ```hcl
 # Module inputs
 inputs = {
-  # Simple configuration - you can override these with dependencies or direct values
-  default_monitoring = {
-    databases = {}
-    lambdas = {}
-    sqs_queues = {}
-    ecs_services = {}
-    eks_clusters = {}
-    eks_pods = {}
-    eks_nodegroups = {}
-    step_functions = {}
-    ec2_instances = {}
-    s3_buckets = {}
-    eventbridge_rules = {}
-    log_alarms = {}
-  }
+  # Clean, simple for loop pattern with automatic file discovery
+  default_monitoring = merge(
+    { for config_file in fileset("${get_terragrunt_dir()}/configs/global", "*.json") :
+      trimsuffix(config_file, ".json") => jsondecode(templatefile("${get_terragrunt_dir()}/configs/global/${config_file}", {
+        CUSTOMER     = local.customer
+        TEAM         = local.team
+        ENVIRONMENT  = local.environment
+        REGION       = local.region
+        PROJECT      = local.project
+        RESOURCE_PREFIX = local.resource_prefix
+        DEFAULT_ALARM_ACTIONS = join(",", try(split(",", get_env("DEFAULT_ALARM_ACTIONS", "")), []))
+        DEFAULT_OK_ACTIONS = join(",", try(split(",", get_env("DEFAULT_OK_ACTIONS", "")), []))
+        DEFAULT_INSUFFICIENT_DATA_ACTIONS = join(",", try(split(",", get_env("DEFAULT_INSUFFICIENT_DATA_ACTIONS", "")), []))
+      }))
+    },
+    { for config_file in fileset("${get_terragrunt_dir()}/configs/local", "*.json") :
+      trimsuffix(config_file, ".json") => jsondecode(templatefile("${get_terragrunt_dir()}/configs/local/${config_file}", {
+        CUSTOMER     = local.customer
+        TEAM         = local.team
+        ENVIRONMENT  = local.environment
+        REGION       = local.region
+        PROJECT      = local.project
+        RESOURCE_PREFIX = local.resource_prefix
+        DEFAULT_ALARM_ACTIONS = join(",", try(split(",", get_env("DEFAULT_ALARM_ACTIONS", "")), []))
+        DEFAULT_OK_ACTIONS = join(",", try(split(",", get_env("DEFAULT_OK_ACTIONS", "")), []))
+        DEFAULT_INSUFFICIENT_DATA_ACTIONS = join(",", try(split(",", get_env("DEFAULT_INSUFFICIENT_DATA_ACTIONS", "")), []))
+      }))
+    },
+    { for config_file in fileset("${get_terragrunt_dir()}/configs/${local.environment}", "*.json") :
+      trimsuffix(config_file, ".json") => jsondecode(templatefile("${get_terragrunt_dir()}/configs/${local.environment}/${config_file}", {
+        CUSTOMER     = local.customer
+        TEAM         = local.team
+        ENVIRONMENT  = local.environment
+        REGION       = local.region
+        PROJECT      = local.project
+        RESOURCE_PREFIX = local.resource_prefix
+        DEFAULT_ALARM_ACTIONS = join(",", try(split(",", get_env("DEFAULT_ALARM_ACTIONS", "")), []))
+        DEFAULT_OK_ACTIONS = join(",", try(split(",", get_env("DEFAULT_OK_ACTIONS", "")), []))
+        DEFAULT_INSUFFICIENT_DATA_ACTIONS = join(",", try(split(",", get_env("DEFAULT_INSUFFICIENT_DATA_ACTIONS", "")), []))
+      }))
+    }
+  )
 }
 ```
+
+**Benefits of this approach:**
+- ✅ **Automatic file discovery**: No need to manually list each JSON file
+- ✅ **Templatefile support**: Variables like `${CUSTOMER}`, `${TEAM}` are interpolated
+- ✅ **Graceful handling**: Missing files don't cause errors
+- ✅ **Environment overrides**: Local and environment-specific files override global
+- ✅ **Clean and simple**: Elegant pattern like your security group examples
 
 ## Using Dependencies (The Right Way)
 
@@ -63,6 +97,7 @@ inputs = {
     eks_clusters = {
       "main-cluster" = {
         name = dependency.eks.outputs.cluster_name
+        short_name = "main"  # Optional: adds short name to alarm names
         customer = local.customer
         team = local.team
         alarms = ["cpu_utilization", "memory_utilization"]
@@ -84,6 +119,8 @@ inputs = {
   common_tags = local.common_tags
 }
 ```
+
+
 
 ## Reading JSON Files (Optional)
 
@@ -114,9 +151,52 @@ inputs = {
 }
 ```
 
-## Environment Variables
+## Templatefile Variable Interpolation
 
-You can control the configuration using environment variables:
+JSON configuration files support templatefile variable interpolation. Variables like `${CUSTOMER}`, `${TEAM}`, `${ENVIRONMENT}` are automatically replaced with actual values:
+
+### Example JSON File with Variables
+
+```json
+{
+  "example-database": {
+    "name": "${RESOURCE_PREFIX}example-database",
+    "customer": "${CUSTOMER}",
+    "team": "${TEAM}",
+    "environment": "${ENVIRONMENT}",
+    "region": "${REGION}",
+    "project": "${PROJECT}",
+    "alarm_actions": ["${DEFAULT_ALARM_ACTIONS}"],
+    "ok_actions": ["${DEFAULT_OK_ACTIONS}"],
+    "insufficient_data_actions": ["${DEFAULT_INSUFFICIENT_DATA_ACTIONS}"],
+    "custom_threshold": 85,
+    "custom_description": "Example database for ${ENVIRONMENT} environment in ${REGION}"
+  }
+}
+```
+
+### Available Variables
+
+| Variable | Description | Example Value |
+|----------|-------------|---------------|
+| `${CUSTOMER}` | Customer name | `"enbd-preprod"` |
+| `${TEAM}` | Team name | `"DNA"` |
+| `${ENVIRONMENT}` | Environment name | `"production"` |
+| `${REGION}` | AWS region | `"us-east-1"` |
+| `${PROJECT}` | Project name | `"my-app"` |
+| `${RESOURCE_PREFIX}` | Resource naming prefix | `"myapp-"` |
+| `${DEFAULT_ALARM_ACTIONS}` | Default alarm action ARNs | `"arn:aws:sns:..."` |
+| `${DEFAULT_OK_ACTIONS}` | Default OK action ARNs | `"arn:aws:sns:..."` |
+| `${DEFAULT_INSUFFICIENT_DATA_ACTIONS}` | Default insufficient data action ARNs | `"arn:aws:sns:..."` |
+
+### Benefits of Templatefile Variables
+
+- ✅ **Dynamic configuration**: Same JSON file works across environments
+- ✅ **Consistent naming**: All resources follow the same naming convention
+- ✅ **Environment-specific values**: Different values for dev/staging/prod
+- ✅ **Centralized control**: Change values in one place (environment variables)
+
+## Environment Variables
 
 ```bash
 # Set environment variables
@@ -127,8 +207,76 @@ export RESOURCE_PREFIX="myapp"
 export PROJECT="my-app"
 export AWS_REGION="us-east-1"
 
+# Default alarm actions (comma-separated ARNs)
+export DEFAULT_ALARM_ACTIONS="arn:aws:sns:us-east-1:123456789012:alerts-topic,arn:aws:sns:us-east-1:123456789012:pagerduty-topic"
+export DEFAULT_OK_ACTIONS="arn:aws:sns:us-east-1:123456789012:resolved-topic"
+export DEFAULT_INSUFFICIENT_DATA_ACTIONS="arn:aws:sns:us-east-1:123456789012:insufficient-data-topic"
+
 # Run terragrunt
 terragrunt plan
+```
+
+## Default Alarm Actions
+
+Configure default actions for all alarms using environment variables or direct configuration:
+
+### Using Environment Variables
+
+```bash
+# Set default alarm actions via environment variables
+export DEFAULT_ALARM_ACTIONS="arn:aws:sns:us-east-1:123456789012:alerts-topic,arn:aws:sns:us-east-1:123456789012:pagerduty-topic"
+export DEFAULT_OK_ACTIONS="arn:aws:sns:us-east-1:123456789012:resolved-topic"
+export DEFAULT_INSUFFICIENT_DATA_ACTIONS="arn:aws:sns:us-east-1:123456789012:insufficient-data-topic"
+```
+
+### Using Direct Configuration
+
+```hcl
+inputs = {
+  # ... other inputs ...
+  
+  # Default alarm actions
+  default_alarm_actions = [
+    "arn:aws:sns:us-east-1:123456789012:alerts-topic",
+    "arn:aws:sns:us-east-1:123456789012:pagerduty-topic"
+  ]
+  
+  default_ok_actions = [
+    "arn:aws:sns:us-east-1:123456789012:resolved-topic"
+  ]
+  
+  default_insufficient_data_actions = [
+    "arn:aws:sns:us-east-1:123456789012:insufficient-data-topic"
+  ]
+  
+  # ... rest of configuration ...
+}
+```
+
+### Overriding Default Actions for Specific Alarms
+
+Individual alarms can override the default actions:
+
+```hcl
+inputs = {
+  default_monitoring = {
+    databases = {
+      "critical-database" = {
+        name = "critical-db"
+        custom_alarms = {
+          "high-cpu" = {
+            alarm_name = "critical-db-high-cpu"
+            # ... other alarm configuration ...
+            alarm_actions = [
+              "arn:aws:sns:us-east-1:123456789012:critical-alerts-topic",
+              "arn:aws:sns:us-east-1:123456789012:emergency-topic"
+            ]  # Overrides default actions for this specific alarm
+          }
+        }
+      }
+    }
+  }
+}
 ```
 
 ## Configuration Examples
@@ -145,12 +293,13 @@ inputs = {
     eks_clusters = {
       "main-cluster" = {
         name = dependency.eks.outputs.cluster_name
+        short_name = "main"  # Optional: adds short name to alarm names
         customer = local.customer
         team = local.team
         alarms = ["cpu_utilization", "memory_utilization"]
         custom_alarms = {
           "high_pod_count" = {
-            alarm_name = "Sev2/${local.customer}/${local.team}/EKS/Cluster/PodCount/pod-count-above-100"
+            alarm_name = "Sev2/${local.customer}/${local.team}/EKS/main/Cluster/PodCount/pod-count-above-100"
             comparison_operator = "GreaterThanThreshold"
             evaluation_periods = 2
             metric_name = "number_of_pods"
@@ -211,6 +360,7 @@ inputs = {
     eks_clusters = {
       "main-cluster" = {
         name = dependency.eks.outputs.cluster_name
+        short_name = "main"  # Optional: adds short name to alarm names
         customer = local.customer
         team = local.team
         alarms = ["cpu_utilization", "memory_utilization"]
@@ -228,6 +378,9 @@ inputs = {
 4. ✅ **Maintainable**: Clear, readable configuration
 5. ✅ **Environment Variables**: Still supports environment variable interpolation
 6. ✅ **Optional JSON**: You can still read JSON files if needed
+7. ✅ **Graceful Handling**: Missing JSON files don't cause errors
+8. ✅ **Automatic Discovery**: No need to manually list each file
+9. ✅ **Templatefile Support**: Variables are interpolated automatically
 
 ## Best Practices
 
@@ -236,6 +389,28 @@ inputs = {
 3. **Keep Configurations Simple**: Avoid complex logic in the terragrunt configuration
 4. **Use JSON Files Sparingly**: Only when you need complex, reusable configurations
 5. **Test Your Dependencies**: Always verify that dependency outputs are available
+6. **Leverage Automatic File Discovery**: Add JSON files to the appropriate directories and they'll be picked up automatically
+7. **Use Templatefile Variables**: Take advantage of variable interpolation in JSON files
+8. **Missing Files Are OK**: The system gracefully handles missing JSON files without errors
+
+## Graceful Handling of Missing Files
+
+The for loop pattern gracefully handles missing JSON files:
+
+- **No Lambda file?** → System continues with just database alarms
+- **No SQS file?** → System continues with other service alarms  
+- **Empty directories?** → System continues with empty maps
+- **Invalid JSON?** → Clear error message pointing to the specific file
+
+**Example**: If you remove `configs/global/lambdas.json`, the plan will show:
+- ✅ **9 database alarms** (from `databases.json`)
+- ✅ **0 Lambda alarms** (empty map from missing file)
+- ✅ **No errors** - clean execution continues
+
+This makes it easy to:
+- Add new service files incrementally
+- Remove service files without breaking the system
+- Test configurations with partial file sets
 
 ## Troubleshooting
 

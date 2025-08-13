@@ -1,0 +1,41 @@
+{
+  "local-web-server": {
+    "name": "local-web-server-${ENVIRONMENT}",
+    "customer": "${CUSTOMER}",
+    "team": "${TEAM}",
+    "environment": "${ENVIRONMENT}",
+    "region": "${REGION}",
+    "project": "${PROJECT}",
+    "alarms": ["cpu_utilization", "memory_utilization", "disk_utilization"],
+    "exclude_alarms": ["network_in", "network_out"],
+    "custom_alarms": {
+      "local-custom-cpu": {
+        "alarm_name": "Sev2/${CUSTOMER}/${TEAM}/EC2/Local/CPU/local-custom-cpu-above-75pct",
+        "comparison_operator": "GreaterThanThreshold",
+        "evaluation_periods": 1,
+        "metric_name": "CPUUtilization",
+        "namespace": "AWS/EC2",
+        "period": 300,
+        "statistic": "Average",
+        "threshold": 75,
+        "alarm_description": "Local web server CPU utilization is above 75% for ${ENVIRONMENT} environment",
+        "dimensions": [
+          {
+            "name": "InstanceId",
+            "value": "local-web-server-${ENVIRONMENT}"
+          }
+        ]
+      }
+    }
+  },
+  "local-app-server": {
+    "name": "local-app-server-${ENVIRONMENT}",
+    "customer": "${CUSTOMER}",
+    "team": "${TEAM}",
+    "environment": "${ENVIRONMENT}",
+    "region": "${REGION}",
+    "project": "${PROJECT}",
+    "alarms": ["cpu_utilization", "status_check_failed"],
+    "custom_alarms": {}
+  }
+}

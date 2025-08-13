@@ -57,3 +57,4 @@ echo "Next steps:"
 echo "1. Review the plan: terragrunt show eks-test-plan.tfplan"
 echo "2. Apply if happy: terragrunt apply eks-test-plan.tfplan"
 
+
