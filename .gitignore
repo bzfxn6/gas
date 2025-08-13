@@ -45,6 +45,18 @@ terraform.rc
 # Terragrunt plan files
 terragrunt-plan-*
 
+# Terragrunt generated files
+terragrunt-debug.tfvars
+terragrunt-debug.tfvars.json
+
+# Terragrunt dependency lock files
+.terragrunt-dependency-lock.hcl
+
+# Terraform and Terragrunt binaries
+terraform
+terragrunt
+*.exe
+
 # AWS credentials and configuration
 .aws/
 aws-credentials
