@@ -21,17 +21,7 @@ locals {
   # Dashboard control - set to false for dev environments where you don't want dashboards
   create_dashboards = get_env("CREATE_DASHBOARDS", "true") == "true"
   
-  # Configuration control - enable/disable specific service monitoring
-  enable_database_monitoring = get_env("ENABLE_DATABASE_MONITORING", "true") == "true"
-  enable_lambda_monitoring = get_env("ENABLE_LAMBDA_MONITORING", "true") == "true"
-  enable_eks_monitoring = get_env("ENABLE_EKS_MONITORING", "true") == "true"
-  enable_ecs_monitoring = get_env("ENABLE_ECS_MONITORING", "true") == "true"
-  enable_ec2_monitoring = get_env("ENABLE_EC2_MONITORING", "true") == "true"
-  enable_s3_monitoring = get_env("ENABLE_S3_MONITORING", "true") == "true"
-  enable_sqs_monitoring = get_env("ENABLE_SQS_MONITORING", "true") == "true"
-  enable_step_functions_monitoring = get_env("ENABLE_STEP_FUNCTIONS_MONITORING", "true") == "true"
-  enable_eventbridge_monitoring = get_env("ENABLE_EVENTBRIDGE_MONITORING", "true") == "true"
-  enable_log_monitoring = get_env("ENABLE_LOG_MONITORING", "true") == "true"
+
 
   # Severity mapping
   severity_levels = {
@@ -77,8 +67,8 @@ inputs = {
   
   # Clean, simple for loop pattern like your security group example
   default_monitoring = merge(
-    { for config_file in fileset("${get_terragrunt_dir()}/configs/global", "*.json") :
-      trimsuffix(config_file, ".json") => jsondecode(templatefile("${get_terragrunt_dir()}/configs/global/${config_file}", {
+                { for config_file in fileset("${get_terragrunt_dir()}/configs/global", "*.json") :
+              replace(trimsuffix(config_file, ".json"), "-", "_") => jsondecode(templatefile("${get_terragrunt_dir()}/configs/global/${config_file}", {
         CUSTOMER     = local.customer
         TEAM         = local.team
         ENVIRONMENT  = local.environment
@@ -89,9 +79,9 @@ inputs = {
         DEFAULT_OK_ACTIONS = join(",", try(split(",", get_env("DEFAULT_OK_ACTIONS", "")), []))
         DEFAULT_INSUFFICIENT_DATA_ACTIONS = join(",", try(split(",", get_env("DEFAULT_INSUFFICIENT_DATA_ACTIONS", "")), []))
       }))
-    },
-    { for config_file in fileset("${get_terragrunt_dir()}/configs/local", "*.json") :
-      trimsuffix(config_file, ".json") => jsondecode(templatefile("${get_terragrunt_dir()}/configs/local/${config_file}", {
+                  },
+              { for config_file in fileset("${get_terragrunt_dir()}/configs/local", "*.json") :
+                replace(trimsuffix(config_file, ".json"), "-", "_") => jsondecode(templatefile("${get_terragrunt_dir()}/configs/local/${config_file}", {
         CUSTOMER     = local.customer
         TEAM         = local.team
         ENVIRONMENT  = local.environment
@@ -102,9 +92,9 @@ inputs = {
         DEFAULT_OK_ACTIONS = join(",", try(split(",", get_env("DEFAULT_OK_ACTIONS", "")), []))
         DEFAULT_INSUFFICIENT_DATA_ACTIONS = join(",", try(split(",", get_env("DEFAULT_INSUFFICIENT_DATA_ACTIONS", "")), []))
       }))
-    },
-    { for config_file in fileset("${get_terragrunt_dir()}/configs/${local.environment}", "*.json") :
-      trimsuffix(config_file, ".json") => jsondecode(templatefile("${get_terragrunt_dir()}/configs/${local.environment}/${config_file}", {
+                  },
+              { for config_file in fileset("${get_terragrunt_dir()}/configs/${local.environment}", "*.json") :
+                replace(trimsuffix(config_file, ".json"), "-", "_") => jsondecode(templatefile("${get_terragrunt_dir()}/configs/${local.environment}/${config_file}", {
         CUSTOMER     = local.customer
         TEAM         = local.team
         ENVIRONMENT  = local.environment

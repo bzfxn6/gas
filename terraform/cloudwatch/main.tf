@@ -9,6 +9,10 @@ locals {
   all_ecs_services = try(var.default_monitoring.ecs_services, {})
   all_eks_clusters = try(var.default_monitoring.eks_clusters, {})
   all_eks_pods = try(var.default_monitoring.eks_pods, {})
+  all_eks_services = try(var.default_monitoring.eks_services, {})
+  all_eks_volumes = try(var.default_monitoring.eks_volumes, {})
+  all_eks_nodes = try(var.default_monitoring.eks_nodes, {})
+  all_eks_asgs = try(var.default_monitoring.eks_asgs, {})
   all_eks_nodegroups = try(var.default_monitoring.eks_nodegroups, {})
   all_step_functions = try(var.default_monitoring.step_functions, {})
   all_ec2_instances = try(var.default_monitoring.ec2_instances, {})
@@ -24,6 +28,10 @@ locals {
     local.eks_cluster_alarms,
     local.ecs_alarms,
     local.eks_pod_alarms,
+    local.eks_service_alarms,
+    local.eks_volume_alarms,
+    local.eks_node_alarms,
+    local.eks_asg_alarms,
     local.eks_nodegroup_alarms,
     local.step_function_alarms,
     local.ec2_alarms,
@@ -93,7 +101,7 @@ resource "aws_cloudwatch_dashboard" "main" {
           ]
           period = alarm_config.period
           stat   = alarm_config.statistic
-          region = data.aws_region.current.name
+          region = data.aws_region.current.id
           title  = alarm_config.alarm_name
         }
       }

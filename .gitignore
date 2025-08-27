@@ -57,6 +57,11 @@ terraform
 terragrunt
 *.exe
 
+# Large document files
+*.doc
+*.docx
+*.pdf
+
 # AWS credentials and configuration
 .aws/
 aws-credentials

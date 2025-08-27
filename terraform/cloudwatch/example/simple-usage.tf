@@ -1,5 +1,17 @@
 # Simple CloudWatch Module Usage Example
-# This example shows basic usage with default monitoring
+# This example shows basic usage with default monitoring and simple overrides
+#
+# The module supports a powerful override system that allows you to customize
+# individual alarm properties without redefining entire alarms. This is perfect
+# for environment-specific configurations (dev vs prod) or customizing specific alarms.
+#
+# Override Example:
+# alarm_overrides = {
+#   cpu_utilization = {
+#     threshold = 70
+#     alarm_description = "Custom description"
+#   }
+# }
 
 module "cloudwatch_simple" {
   source = "../"
@@ -45,6 +57,20 @@ module "cloudwatch_simple" {
     eks_clusters = {
       main-cluster = {
         name = "main-eks-cluster"
+        short_name = "main"
+        customer = "my-company"
+        team = "platform"
+        # Optional: Add alarm overrides for environment-specific customization
+        alarm_overrides = {
+          cpu_utilization = {
+            threshold = 70
+            alarm_description = "Main EKS cluster CPU utilization is above 70%"
+          }
+          memory_utilization = {
+            threshold = 75
+            alarm_description = "Main EKS cluster memory utilization is above 75%"
+          }
+        }
       }
     }
     

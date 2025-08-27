@@ -378,6 +378,7 @@ inputs = {
 4. ✅ **Maintainable**: Clear, readable configuration
 5. ✅ **Environment Variables**: Still supports environment variable interpolation
 6. ✅ **Optional JSON**: You can still read JSON files if needed
+7. ✅ **Simple Overrides**: Powerful override system for customizing individual alarms
 7. ✅ **Graceful Handling**: Missing JSON files don't cause errors
 8. ✅ **Automatic Discovery**: No need to manually list each file
 9. ✅ **Templatefile Support**: Variables are interpolated automatically
@@ -392,6 +393,90 @@ inputs = {
 6. **Leverage Automatic File Discovery**: Add JSON files to the appropriate directories and they'll be picked up automatically
 7. **Use Templatefile Variables**: Take advantage of variable interpolation in JSON files
 8. **Missing Files Are OK**: The system gracefully handles missing JSON files without errors
+9. **Use Simple Overrides**: Leverage the override system for environment-specific customizations
+
+## Simple Override System
+
+The module supports a powerful **simple override system** that allows you to customize individual alarm properties without redefining entire alarms. This is perfect for environment-specific configurations (dev vs prod) or customizing specific alarms.
+
+### Basic Override Example
+
+```json
+{
+  "my-eks-cluster": {
+    "name": "my-eks-cluster",
+    "short_name": "prod",
+    "customer": "my-company",
+    "team": "platform",
+    "alarm_overrides": {
+      "cpu_utilization": {
+        "alarm_name": "Sev1/my-company/platform/EKS/prod/Cluster/CPU/cpu-utilization-above-70pct",
+        "threshold": 70,
+        "alarm_description": "Production EKS cluster CPU utilization is above 70%"
+      }
+    }
+  }
+}
+```
+
+### Environment-Specific Overrides
+
+```json
+// configs/global/eks-clusters.json (defaults)
+{
+  "my-eks-cluster": {
+    "name": "my-eks-cluster",
+    "short_name": "prod",
+    "customer": "my-company",
+    "team": "platform"
+  }
+}
+
+// configs/local/eks-clusters.json (dev overrides)
+{
+  "my-eks-cluster": {
+    "alarm_overrides": {
+      "cpu_utilization": {
+        "alarm_name": "Sev3/my-company/platform/EKS/dev/Cluster/CPU/cpu-utilization-above-90pct",
+        "threshold": 90
+      }
+    }
+  }
+}
+```
+
+### Multiple Property Overrides
+
+```json
+{
+  "my-database": {
+    "name": "my-production-db",
+    "customer": "my-company",
+    "team": "platform",
+    "alarm_overrides": {
+      "cpu_utilization": {
+        "alarm_name": "Sev1/my-company/platform/RDS/CPU/cpu-utilization-above-70pct",
+        "threshold": 70,
+        "evaluation_periods": 1,
+        "alarm_description": "Production database CPU utilization is above 70%"
+      },
+      "memory_utilization": {
+        "alarm_name": "Sev1/my-company/platform/RDS/Memory/memory-utilization-above-75pct",
+        "threshold": 75
+      }
+    }
+  }
+}
+```
+
+### Benefits of the Override System
+
+- ✅ **Simple configuration**: Just specify what you want to change
+- ✅ **Defaults preserved**: Everything else uses the default configuration
+- ✅ **Environment-specific**: Different settings for dev/prod/staging
+- ✅ **Flexible**: Override any alarm property (threshold, description, evaluation_periods, etc.)
+- ✅ **Clean JSON**: No need to duplicate entire alarm definitions
+- ✅ **Maintainable**: Easy to update and version control
 
 ## Graceful Handling of Missing Files
 

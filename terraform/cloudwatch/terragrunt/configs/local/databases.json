@@ -1,6 +1,7 @@
 {
   "main-database": {
     "name": "local-main-database-${ENVIRONMENT}",
+    "short_name": "main",
     "customer": "${CUSTOMER}",
     "team": "${TEAM}",
     "environment": "${ENVIRONMENT}",
@@ -30,6 +31,7 @@
   },
   "local-analytics-db": {
     "name": "local-analytics-database-${ENVIRONMENT}",
+    "short_name": "analytics",
     "customer": "${CUSTOMER}",
     "team": "${TEAM}",
     "environment": "${ENVIRONMENT}",

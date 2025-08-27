@@ -1,50 +1,15 @@
 {
-  "dev-cluster": {
-    "name": "dev-eks-cluster",
-    "short_name": "dev",
-    "customer": "dev-account",
-    "team": "dev-team",
-    "alarms": ["cpu_utilization", "memory_utilization"],
-    "exclude_alarms": ["network_rx", "network_tx"],
-    "custom_alarms": {
-      "high_pod_count": {
-        "alarm_name": "Sev2/dev-account/dev-team/EKS/dev/Cluster/PodCount/pod-count-above-100",
-        "comparison_operator": "GreaterThanThreshold",
-        "evaluation_periods": 2,
-        "metric_name": "number_of_pods",
-        "namespace": "ContainerInsights",
-        "period": 300,
-        "statistic": "Average",
-        "threshold": 100,
-        "alarm_description": "EKS cluster pod count is above 100",
-        "treat_missing_data": "notBreaching",
-        "unit": "Count",
-        "dimensions": [
-          {
-            "name": "ClusterName",
-            "value": "dev-eks-cluster"
-          }
-        ]
+  "test-cluster": {
+    "alarms": ["cpu_utilization"],
+    "customer": "test-account",
+    "name": "test-eks-cluster",
+    "short_name": "cluster",
+    "team": "test-team",
+    "alarm_overrides": {
+      "cpu_utilization": {
+        "threshold": 75,
+        "alarm_description": "Custom cluster CPU threshold at 75%"
       }
     }
-  },
-  "prod-cluster": {
-    "name": "prod-eks-cluster",
-    "short_name": "prod",
-    "customer": "prod-account",
-    "team": "prod-team"
-  },
-  "staging-cluster": {
-    "name": "staging-eks-cluster",
-    "short_name": "stg",
-    "customer": "staging-account",
-    "team": "staging-team",
-    "alarms": ["cpu_utilization", "memory_utilization", "disk_utilization", "pod_count"],
-    "exclude_alarms": ["network_rx", "network_tx", "node_count"]
-  },
-  "legacy-cluster": {
-    "name": "legacy-eks-cluster",
-    "customer": "legacy-account",
-    "team": "legacy-team"
   }
 }

@@ -6,7 +6,7 @@ locals {
   eks_nodegroup_alarms = merge([
     for nodegroup_key, nodegroup_config in local.all_eks_nodegroups : {
       for alarm_key, alarm_config in {
-        nodegroup_health = {
+        nodegroup_health = merge({
           alarm_name = "Sev1/${coalesce(try(nodegroup_config.customer, null), var.customer)}/${coalesce(try(nodegroup_config.team, null), var.team)}/EKS/NodeGroups/Health/nodegroup-health-check-failed"
           comparison_operator = "GreaterThanThreshold"
           evaluation_periods = 1
@@ -21,8 +21,8 @@ locals {
           severity = "Sev1"
           sub_service = "Health"
           error_details = "nodegroup-health-check-failed"
-        }
-        node_count = {
+        }, try(nodegroup_config.alarm_overrides.nodegroup_health, {}))
+        node_count = merge({
           alarm_name = "Sev1/${coalesce(try(nodegroup_config.customer, null), var.customer)}/${coalesce(try(nodegroup_config.team, null), var.team)}/EKS/NodeGroups/NodeCount/node-count-below-1"
           comparison_operator = "LessThanThreshold"
           evaluation_periods = 1
@@ -37,8 +37,8 @@ locals {
           severity = "Sev1"
           sub_service = "NodeCount"
           error_details = "node-count-below-1"
-        }
-        scaling_activity = {
+        }, try(nodegroup_config.alarm_overrides.node_count, {}))
+        scaling_activity = merge({
           alarm_name = "Sev2/${coalesce(try(nodegroup_config.customer, null), var.customer)}/${coalesce(try(nodegroup_config.team, null), var.team)}/EKS/NodeGroups/Scaling/scaling-activity-detected"
           comparison_operator = "GreaterThanThreshold"
           evaluation_periods = 1
@@ -53,8 +53,8 @@ locals {
           severity = "Sev2"
           sub_service = "Scaling"
           error_details = "scaling-activity-detected"
-        }
-        capacity_utilization = {
+        }, try(nodegroup_config.alarm_overrides.scaling_activity, {}))
+        capacity_utilization = merge({
           alarm_name = "Sev2/${coalesce(try(nodegroup_config.customer, null), var.customer)}/${coalesce(try(nodegroup_config.team, null), var.team)}/EKS/NodeGroups/Capacity/capacity-utilization-above-85pct"
           comparison_operator = "GreaterThanThreshold"
           evaluation_periods = 2
@@ -69,8 +69,8 @@ locals {
           severity = "Sev2"
           sub_service = "Capacity"
           error_details = "capacity-utilization-above-85pct"
-        }
-        instance_health = {
+        }, try(nodegroup_config.alarm_overrides.capacity_utilization, {}))
+        instance_health = merge({
           alarm_name = "Sev2/${coalesce(try(nodegroup_config.customer, null), var.customer)}/${coalesce(try(nodegroup_config.team, null), var.team)}/EKS/NodeGroups/InstanceHealth/unhealthy-instances-detected"
           comparison_operator = "GreaterThanThreshold"
           evaluation_periods = 1
@@ -85,7 +85,7 @@ locals {
           severity = "Sev2"
           sub_service = "InstanceHealth"
           error_details = "unhealthy-instances-detected"
-        }
+        }, try(nodegroup_config.alarm_overrides.instance_health, {}))
       } : "${nodegroup_key}-${alarm_key}" => merge(alarm_config, {
         dimensions = [{
           name = "NodegroupName"

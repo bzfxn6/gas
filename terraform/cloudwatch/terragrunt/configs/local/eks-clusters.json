@@ -1,21 +1,16 @@
 {
   "test-cluster": {
-    "name": "test-eks-cluster",
-    "short_name": "test",
+    "alarms": ["cpu_utilization"],
     "customer": "test-account",
+    "name": "test-eks-cluster",
+    "short_name": "cluster",
     "team": "test-team",
-    "alarms": ["cpu_utilization", "memory_utilization", "disk_utilization"]
-  },
-  "prod-cluster": {
-    "name": "prod-eks-cluster",
-    "short_name": "prod",
-    "customer": "prod-account",
-    "team": "prod-team"
-  },
-  "legacy-cluster": {
-    "name": "legacy-eks-cluster",
-    "customer": "legacy-account",
-    "team": "legacy-team"
+    "alarm_overrides": {
+      "cpu_utilization": {
+        "threshold": 75,
+        "alarm_description": "Custom cluster CPU threshold at 75%"
+      }
+    }
   }
 }
 

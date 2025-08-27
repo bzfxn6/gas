@@ -4,7 +4,8 @@ This Terraform module provides a comprehensive solution for CloudWatch monitorin
 
 ## Features
 
-- **Automatic Default Monitoring**: Pre-configured alarms and metrics for databases, Lambda functions, SQS queues, and ECS services
+- **Automatic Default Monitoring**: Pre-configured alarms and metrics for databases, Lambda functions, SQS queues, ECS services, and comprehensive EKS monitoring (clusters, pods, services, volumes, nodes, ASGs, node groups)
+- **Simple Override System**: Easily override individual alarm properties (severity, threshold, etc.) without redefining entire alarms
 - **Default Alarm Actions**: Configure default actions (SNS topics, Lambda functions, etc.) for all alarms
 - **Custom Monitoring**: Full support for custom alarms, metrics, and dashboards
 - **Dashboard Linking**: Create overview dashboards that link to specific resource dashboards
@@ -40,6 +41,37 @@ module "cloudwatch" {
     
     sqs_queues = {
       events = { name = "events-queue" }
+    }
+    
+    eks_clusters = {
+      prod-cluster = { 
+        name = "prod-eks-cluster"
+        short_name = "prod"
+        customer = "my-company"
+        team = "platform"
+      }
+    }
+    
+    eks_pods = {
+      web-pod = {
+        name = "web-pod"
+        namespace = "default"
+        cluster_name = "prod-eks-cluster"
+      }
+    }
+    
+    eks_services = {
+      web-service = {
+        name = "web-service"
+        namespace = "default"
+        cluster_name = "prod-eks-cluster"
+      }
+    }
+    
+    eks_asgs = {
+      worker-asg = {
+        name = "eks-worker-asg"
+      }
     }
   }
 }
@@ -93,6 +125,308 @@ This simple configuration will automatically create:
 - 5 default alarms for each database (CPU, memory, connections, read/write latency)
 - 3 default alarms for each Lambda (errors, duration, throttles)
 - 3 default alarms for each SQS queue (message age, queue depth, failed messages)
+- 11 default alarms for each EKS cluster (CPU, memory, disk, failed nodes, API server, scheduler)
+- 8 default alarms for each EKS pod (CPU, memory, restarts, container metrics)
+- 1 default alarm for each EKS service (running pods)
+- 2 default alarms for each EKS volume (usage, available space)
+- 3 default alarms for each EKS node (CPU, memory, filesystem)
+- 8 default alarms for each EKS ASG (status checks, CPU, EBS, network)
+- 3 default alarms for each EKS node group (CPU, memory, disk)
+
+### Comprehensive EKS Monitoring
+
+The module provides comprehensive monitoring for all EKS components using CloudWatch Container Insights and EKS metrics. Each EKS resource type automatically gets pre-configured alarms with sensible defaults.
+
+#### 1. EKS Clusters (`eks_clusters`)
+
+**Available EKS Cluster Alarms:**
+- **`cpu_utilization`** - Monitors `node_cpu_utilization` metric (alerts when > 80%)
+- **`memory_utilization`** - Monitors `node_memory_utilization` metric (alerts when > 80%)
+- **`disk_utilization`** - Monitors `node_filesystem_utilization` metric (alerts when > 85%)
+- **`failed_node_count`** - Monitors `cluster_failed_node_count` metric (alerts when > 0)
+- **`apiserver_request_total_4xx`** - Monitors API server 4XX requests (alerts when > 10)
+- **`apiserver_request_total_5xx`** - Monitors API server 5XX requests (alerts when > 1)
+- **`apiserver_request_total_429`** - Monitors API server rate limiting (alerts when > 5)
+- **`scheduler_pending_pods`** - Monitors pending pods (alerts when > 10)
+- **`scheduler_pending_pods_unschedulable`** - Monitors unschedulable pods (alerts when > 5)
+- **`apiserver_request_duration_seconds_get_p99`** - Monitors GET request duration P99 (alerts when > 1s)
+- **`apiserver_current_inflight_requests`** - Monitors inflight requests (alerts when > 100)
+
+**EKS Cluster Configuration:**
+```json
+{
+  "prod-cluster": {
+    "name": "prod-eks-cluster",
+    "short_name": "prod",
+    "customer": "my-company",
+    "team": "platform",
+    "alarms": ["cpu_utilization", "memory_utilization", "apiserver_request_total_5xx"],
+    "exclude_alarms": ["failed_node_count"],
+    "alarm_overrides": {
+      "cpu_utilization": {
+        "threshold": 70,
+        "alarm_description": "Production EKS cluster CPU utilization is above 70%"
+      }
+    }
+  }
+}
+```
+
+#### 2. EKS Pods (`eks_pods`)
+
+**Available EKS Pod Alarms:**
+- **`cpu_utilization`** - Monitors `pod_cpu_utilization_over_pod_limit` metric (alerts when > 80%)
+- **`memory_utilization`** - Monitors `container_memory_working_set` metric (alerts when > 80%)
+- **`restart_count`** - Monitors `pod_number_of_container_restarts` metric (alerts when > 5)
+- **`container_cpu_utilization`** - Monitors `container_cpu_utilization` metric (alerts when > 80%)
+- **`container_cpu_request`** - Monitors `container_cpu_request` metric (alerts when > 80%)
+- **`container_memory_limit`** - Monitors `container_memory_limit` metric (alerts when > 80%)
+- **`container_memory_utilization`** - Monitors `container_memory_utilization` metric (alerts when > 80%)
+- **`container_memory_request`** - Monitors `container_memory_request` metric (alerts when > 80%)
+
+**EKS Pod Configuration:**
+```json
+{
+  "web-pod": {
+    "name": "web-pod",
+    "namespace": "default",
+    "cluster_name": "prod-eks-cluster",
+    "customer": "my-company",
+    "team": "platform",
+    "alarms": ["cpu_utilization", "memory_utilization", "restart_count"],
+    "alarm_overrides": {
+      "cpu_utilization": {
+        "threshold": 70,
+        "alarm_description": "Web pod CPU utilization is above 70%"
+      }
+    }
+  }
+}
+```
+
+#### 3. EKS Services (`eks_services`)
+
+**Available EKS Service Alarms:**
+- **`running_pods`** - Monitors `service_number_of_running_pods` metric (alerts when < 1)
+
+**EKS Service Configuration:**
+```json
+{
+  "web-service": {
+    "name": "web-service",
+    "namespace": "default",
+    "cluster_name": "prod-eks-cluster",
+    "customer": "my-company",
+    "team": "platform",
+    "alarm_overrides": {
+      "running_pods": {
+        "threshold": 2,
+        "alarm_description": "Web service has less than 2 running pods"
+      }
+    }
+  }
+}
+```
+
+#### 4. EKS Volumes (`eks_volumes`)
+
+**Available EKS Volume Alarms:**
+- **`volume_used_percentage`** - Monitors `kubelet_volume_stats_used_bytes` metric (alerts when > 85%)
+- **`volume_available_bytes`** - Monitors `kubelet_volume_stats_available_bytes` metric (alerts when < 1GB)
+
+**EKS Volume Configuration:**
+```json
+{
+  "data-volume": {
+    "name": "data-pvc",
+    "namespace": "default",
+    "customer": "my-company",
+    "team": "platform",
+    "alarms": ["volume_used_percentage"],
+    "alarm_overrides": {
+      "volume_used_percentage": {
+        "threshold": 90,
+        "alarm_description": "Data volume usage is above 90%"
+      }
+    }
+  }
+}
+```
+
+#### 5. EKS Nodes (`eks_nodes`)
+
+**Available EKS Node Alarms:**
+- **`node_cpu_utilization`** - Monitors `node_cpu_utilization` metric (alerts when > 80%)
+- **`node_memory_utilization`** - Monitors `node_memory_utilization` metric (alerts when > 80%)
+- **`node_filesystem_utilization`** - Monitors `node_filesystem_utilization` metric (alerts when > 85%)
+
+**EKS Node Configuration:**
+```json
+{
+  "worker-node": {
+    "name": "worker-node-1",
+    "instance_id": "i-1234567890abcdef0",
+    "cluster_name": "prod-eks-cluster",
+    "customer": "my-company",
+    "team": "platform",
+    "alarms": ["node_cpu_utilization", "node_memory_utilization"],
+    "alarm_overrides": {
+      "node_cpu_utilization": {
+        "threshold": 85,
+        "alarm_description": "Worker node CPU utilization is above 85%"
+      }
+    }
+  }
+}
+```
+
+#### 6. EKS Auto Scaling Groups (`eks_asgs`)
+
+**Available EKS ASG Alarms:**
+- **`status_check_failed`** - Monitors `StatusCheckFailed` metric (alerts when > 0)
+- **`status_check_failed_system`** - Monitors `StatusCheckFailed_System` metric (alerts when > 0)
+- **`status_check_failed_instance`** - Monitors `StatusCheckFailed_Instance` metric (alerts when > 0)
+- **`cpu_utilization`** - Monitors `CPUUtilization` metric (alerts when > 80%)
+- **`ebs_read_ops`** - Monitors `EBSReadOps` metric (alerts when > 1000)
+- **`ebs_write_ops`** - Monitors `EBSWriteOps` metric (alerts when > 1000)
+- **`network_in`** - Monitors `NetworkIn` metric (alerts when > 100MB)
+- **`network_out`** - Monitors `NetworkOut` metric (alerts when > 100MB)
+
+**EKS ASG Configuration:**
+```json
+{
+  "worker-asg": {
+    "name": "eks-worker-asg",
+    "customer": "my-company",
+    "team": "platform",
+    "alarms": ["status_check_failed", "cpu_utilization"],
+    "alarm_overrides": {
+      "cpu_utilization": {
+        "threshold": 85,
+        "alarm_description": "Worker ASG CPU utilization is above 85%"
+      }
+    }
+  }
+}
+```
+
+#### 7. EKS Node Groups (`eks_nodegroups`)
+
+**Available EKS Node Group Alarms:**
+- **`cpu_utilization`** - Monitors `CPUUtilization` metric (alerts when > 80%)
+- **`memory_utilization`** - Monitors memory utilization (alerts when > 80%)
+- **`disk_utilization`** - Monitors disk utilization (alerts when > 85%)
+
+**EKS Node Group Configuration:**
+```json
+{
+  "worker-nodegroup": {
+    "name": "worker-nodegroup",
+    "cluster_name": "prod-eks-cluster",
+    "customer": "my-company",
+    "team": "platform",
+    "alarms": ["cpu_utilization", "memory_utilization"],
+    "alarm_overrides": {
+      "cpu_utilization": {
+        "threshold": 85,
+        "alarm_description": "Worker node group CPU utilization is above 85%"
+      }
+    }
+  }
+}
+```
+
+**EKS Monitoring Features:**
+- ✅ **Short name support** - Includes cluster short name in alarm names for better organization
+- ✅ **Selective alarms** - Use `alarms` list to specify only certain alarms
+- ✅ **Exclude alarms** - Use `exclude_alarms` to exclude specific alarms
+- ✅ **Simple overrides** - Override individual alarm properties without redefining entire alarms
+- ✅ **Valid metrics only** - Uses only CloudWatch metrics that actually exist in AWS
+- ✅ **Comprehensive coverage** - Monitors clusters, pods, services, volumes, nodes, ASGs, and node groups
+- ✅ **Environment-specific** - Different thresholds and configurations for dev/prod environments
+
+### Simple Override System
+
+The module supports a powerful **simple override system** that allows you to customize individual alarm properties without redefining entire alarms. This is perfect for environment-specific configurations (dev vs prod) or customizing specific alarms.
+
+#### Basic Override Example
+
+```json
+{
+  "my-eks-cluster": {
+    "name": "my-eks-cluster",
+    "short_name": "prod",
+    "customer": "my-company",
+    "team": "platform",
+    "alarm_overrides": {
+      "cpu_utilization": {
+        "alarm_name": "Sev1/my-company/platform/EKS/prod/Cluster/CPU/cpu-utilization-above-70pct",
+        "threshold": 70,
+        "alarm_description": "Production EKS cluster CPU utilization is above 70%"
+      }
+    }
+  }
+}
+```
+
+#### Environment-Specific Overrides
+
+```json
+// configs/global/eks-clusters.json (defaults)
+{
+  "my-eks-cluster": {
+    "name": "my-eks-cluster",
+    "short_name": "prod",
+    "customer": "my-company",
+    "team": "platform"
+  }
+}
+
+// configs/local/eks-clusters.json (dev overrides)
+{
+  "my-eks-cluster": {
+    "alarm_overrides": {
+      "cpu_utilization": {
+        "alarm_name": "Sev3/my-company/platform/EKS/dev/Cluster/CPU/cpu-utilization-above-90pct",
+        "threshold": 90
+      }
+    }
+  }
+}
+```
+
+#### Multiple Property Overrides
+
+```json
+{
+  "my-database": {
+    "name": "my-production-db",
+    "customer": "my-company",
+    "team": "platform",
+    "alarm_overrides": {
+      "cpu_utilization": {
+        "alarm_name": "Sev1/my-company/platform/RDS/CPU/cpu-utilization-above-70pct",
+        "threshold": 70,
+        "evaluation_periods": 1,
+        "alarm_description": "Production database CPU utilization is above 70%"
+      },
+      "memory_utilization": {
+        "alarm_name": "Sev1/my-company/platform/RDS/Memory/memory-utilization-above-75pct",
+        "threshold": 75
+      }
+    }
+  }
+}
+```
+
+#### Benefits of the Override System
+
+- ✅ **Simple configuration**: Just specify what you want to change
+- ✅ **Defaults preserved**: Everything else uses the default configuration
+- ✅ **Environment-specific**: Different settings for dev/prod/staging
+- ✅ **Flexible**: Override any alarm property (threshold, description, evaluation_periods, etc.)
+- ✅ **Clean JSON**: No need to duplicate entire alarm definitions
+- ✅ **Maintainable**: Easy to update and version control
 
 ### Default Alarm Actions
 
@@ -1186,4 +1520,60 @@ module "cloudwatch" {
 6. **Lambda-Specific**: Adjust thresholds based on function criticality
 7. **Hybrid Approach**: Combine multiple methods for maximum flexibility
 
-The template system gives you complete control over thresholds while maintaining the convenience of defaults. You can start with default thresholds and gradually customize them for specific instances as needed! 
+The template system gives you complete control over thresholds while maintaining the convenience of defaults. You can start with default thresholds and gradually customize them for specific instances as needed!
+
+## Examples
+
+The module includes several example files demonstrating different usage patterns:
+
+- `example/simple-usage.tf` - Basic usage with default monitoring and simple overrides
+- `example/override-examples.tf` - Comprehensive examples of the simple override system
+- `example/selective-alarms.tf` - Selective alarm configuration
+- `example/comprehensive-example.tf` - Comprehensive example with all features
+
+### Quick Start Examples
+
+#### Simple Override Example
+```hcl
+module "cloudwatch" {
+  source = "./terraform/cloudwatch"
+  
+  default_monitoring = {
+    eks_clusters = {
+      my-cluster = {
+        name = "my-eks-cluster"
+        alarm_overrides = {
+          cpu_utilization = {
+            alarm_name = "Sev1/my-company/platform/EKS/prod/Cluster/CPU/cpu-utilization-above-70pct"
+            threshold = 70
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+#### Environment-Specific Overrides
+```hcl
+# Global configuration (defaults)
+eks_clusters = {
+  my-cluster = {
+    name = "my-eks-cluster"
+    customer = "my-company"
+    team = "platform"
+  }
+}
+
+# Local configuration (overrides)
+eks_clusters = {
+  my-cluster = {
+    alarm_overrides = {
+      cpu_utilization = {
+        alarm_name = "Sev3/my-company/platform/EKS/dev/Cluster/CPU/cpu-utilization-above-90pct"
+        threshold = 90
+      }
+    }
+  }
+}
+``` 

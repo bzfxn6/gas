@@ -1,6 +1,7 @@
 {
   "local-web-server": {
     "name": "local-web-server-${ENVIRONMENT}",
+    "short_name": "web",
     "customer": "${CUSTOMER}",
     "team": "${TEAM}",
     "environment": "${ENVIRONMENT}",
@@ -30,6 +31,7 @@
   },
   "local-app-server": {
     "name": "local-app-server-${ENVIRONMENT}",
+    "short_name": "app",
     "customer": "${CUSTOMER}",
     "team": "${TEAM}",
     "environment": "${ENVIRONMENT}",

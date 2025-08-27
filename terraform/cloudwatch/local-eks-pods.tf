@@ -6,7 +6,7 @@ locals {
   eks_pod_alarms = merge([
     for pod_key, pod_config in local.all_eks_pods : {
       for alarm_key, alarm_config in {
-        cpu_utilization = {
+        cpu_utilization = merge({
           alarm_name = "Sev2/${coalesce(try(pod_config.customer, null), var.customer)}/${coalesce(try(pod_config.team, null), var.team)}/EKS/Pods/CPU/cpu-utilization-above-80pct"
           comparison_operator = "GreaterThanThreshold"
           evaluation_periods = 2
@@ -21,8 +21,8 @@ locals {
           severity = "Sev2"
           sub_service = "CPU"
           error_details = "cpu-utilization-above-80pct"
-        }
-        memory_utilization = {
+        }, try(pod_config.alarm_overrides.cpu_utilization, {}))
+        memory_utilization = merge({
           alarm_name = "Sev2/${coalesce(try(pod_config.customer, null), var.customer)}/${coalesce(try(pod_config.team, null), var.team)}/EKS/Pods/Memory/memory-utilization-above-80pct"
           comparison_operator = "GreaterThanThreshold"
           evaluation_periods = 2
@@ -37,8 +37,8 @@ locals {
           severity = "Sev2"
           sub_service = "Memory"
           error_details = "memory-utilization-above-80pct"
-        }
-        restart_count = {
+        }, try(pod_config.alarm_overrides.memory_utilization, {}))
+        restart_count = merge({
           alarm_name = "Sev2/${coalesce(try(pod_config.customer, null), var.customer)}/${coalesce(try(pod_config.team, null), var.team)}/EKS/Pods/Restarts/restart-count-above-5"
           comparison_operator = "GreaterThanThreshold"
           evaluation_periods = 2
@@ -53,8 +53,8 @@ locals {
           severity = "Sev2"
           sub_service = "Restarts"
           error_details = "restart-count-above-5"
-        }
-        network_receive = {
+        }, try(pod_config.alarm_overrides.restart_count, {}))
+        network_receive = merge({
           alarm_name = "Sev2/${coalesce(try(pod_config.customer, null), var.customer)}/${coalesce(try(pod_config.team, null), var.team)}/EKS/Pods/NetworkRX/network-receive-above-1gb"
           comparison_operator = "GreaterThanThreshold"
           evaluation_periods = 2
@@ -69,8 +69,8 @@ locals {
           severity = "Sev2"
           sub_service = "NetworkRX"
           error_details = "network-receive-above-1gb"
-        }
-        network_transmit = {
+        }, try(pod_config.alarm_overrides.network_receive, {}))
+        network_transmit = merge({
           alarm_name = "Sev2/${coalesce(try(pod_config.customer, null), var.customer)}/${coalesce(try(pod_config.team, null), var.team)}/EKS/Pods/NetworkTX/network-transmit-above-1gb"
           comparison_operator = "GreaterThanThreshold"
           evaluation_periods = 2
@@ -85,7 +85,7 @@ locals {
           severity = "Sev2"
           sub_service = "NetworkTX"
           error_details = "network-transmit-above-1gb"
-        }
+        }, try(pod_config.alarm_overrides.network_transmit, {}))
       } : "${pod_key}-${alarm_key}" => merge(alarm_config, {
         dimensions = [{
           name = "PodName"

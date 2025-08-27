@@ -1,55 +1,15 @@
 {
-  "main-nodegroup": {
-    "name": "main-nodegroup",
-    "cluster_name": "main-eks-cluster",
-    "asg_name": "eks-main-eks-cluster-main-nodegroup-20231201",
-    "region": "us-east-1",
-    "customer": "enbd-preprod",
-    "team": "DNA",
-    "alarms": ["nodegroup_health", "node_count", "instance_health", "capacity_utilization", "status_check_failed", "cpu_utilization", "ebs_io_balance"],
-    "custom_alarms": {
-      "strict-node-count": {
-        "alarm_name": "Sev1/enbd-preprod/DNA/EKS/NodeGroup/Nodes/strict-node-count-below-2",
-        "comparison_operator": "LessThanThreshold",
-        "evaluation_periods": 1,
-        "metric_name": "node_count",
-        "namespace": "AWS/EKS",
-        "period": 300,
-        "statistic": "Average",
-        "threshold": 2,
-        "alarm_description": "Main node group has fewer than 2 nodes",
-        "dimensions": [
-          {
-            "name": "ClusterName",
-            "value": "main-eks-cluster"
-          },
-          {
-            "name": "NodegroupName",
-            "value": "main-nodegroup"
-          }
-        ]
+  "test-nodegroup": {
+    "alarms": ["nodegroup_health"],
+    "customer": "test-account",
+    "name": "test-nodegroup",
+    "short_name": "nodegroup",
+    "team": "test-team",
+    "alarm_overrides": {
+      "nodegroup_health": {
+        "threshold": 1,
+        "alarm_description": "Custom nodegroup health threshold at 1"
       }
     }
-  },
-  "spot-nodegroup": {
-    "name": "spot-nodegroup",
-    "cluster_name": "main-eks-cluster",
-    "asg_name": "eks-main-eks-cluster-spot-nodegroup-20231201",
-    "region": "us-east-1",
-    "customer": "enbd-preprod",
-    "team": "DNA",
-    "alarms": ["nodegroup_health", "node_count", "spot_interruption", "capacity_utilization", "status_check_failed", "cpu_utilization"],
-    "exclude_alarms": ["launch_template_version"],
-    "custom_alarms": {}
-  },
-  "gpu-nodegroup": {
-    "name": "gpu-nodegroup",
-    "cluster_name": "main-eks-cluster",
-    "asg_name": "eks-main-eks-cluster-gpu-nodegroup-20231201",
-    "region": "us-east-1",
-    "customer": "enbd-preprod",
-    "team": "DNA",
-    "alarms": ["nodegroup_health", "node_count", "instance_health", "instance_type_utilization", "status_check_failed", "cpu_utilization", "ebs_io_balance"],
-    "custom_alarms": {}
   }
 }
